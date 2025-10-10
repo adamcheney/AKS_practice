@@ -1,1 +1,10 @@
 **/.env
+**/*.crt
+**/*.key
+**/*.pem
+**/.vscode
+**/.DS_Store
+**/.terraform
+*.tfstate
+*.tfstate*
+**/*.code-workspace
