@@ -17,7 +17,10 @@ Describe "Set-AzResourceGroup Function Tests" {
 
         # Connect to Azure using the necessary credentials before running any Azure-specific tests.
         # NOTE: You must be authenticated for these tests to run successfully.
-        Write-Host "Please ensure you are connected to Azure (Connect-AzAccount) before running tests." -ForegroundColor Red
+        $context = Get-AzContext -ErrorAction SilentlyContinue
+        if (-not $context) {
+            throw "Not logged in to Azure. Please run Connect-AzAccount"
+        }
 
         # Cleanup any previous test runs that might have failed to tear down
         Remove-AzResourceGroup -Name $TestRGName -Force -Confirm:$false -ErrorAction SilentlyContinue
@@ -35,13 +38,13 @@ Describe "Set-AzResourceGroup Function Tests" {
             $Result = Set-AzResourceGroup -ResourceGroupName $TestRGName -Location $TestLocation
 
             # Assertion 1: Check that the function returned a successful object
-            $Result | Should Not BeNullOrEmpty
+            $Result | Should -Not -BeNullOrEmpty
 
             # Assertion 2: Check that the object is a Resource Group
-            $Result.GetType().Name | Should Be "PSResourceGroup"
+            $Result.GetType().Name | Should -Be "PSResourceGroup"
 
             # Assertion 3: Verify the RG exists in Azure after the run
-            (Get-AzResourceGroup -Name $TestRGName -ErrorAction Stop).ResourceGroupName | Should Be $TestRGName
+            (Get-AzResourceGroup -Name $TestRGName -ErrorAction Stop).ResourceGroupName | Should -Be $TestRGName
         }
     }
 
@@ -62,10 +65,10 @@ Describe "Set-AzResourceGroup Function Tests" {
             # Assertion: In -WhatIf mode, the result should confirm the intended skip (empty output)
             # The function's logic should show 'already exists', but no WhatIf creation message.
             # For simplicity, we just ensure no creation object is returned.
-            $Result | Should BeNullOrEmpty
+            $Result | Should -BeNullOrEmpty
 
             # We verify the RG still exists to ensure the function didn't accidentally delete it.
-            (Get-AzResourceGroup -Name $TestRGName -ErrorAction Stop).ResourceGroupName | Should Be $TestRGName
+            (Get-AzResourceGroup -Name $TestRGName -ErrorAction Stop).ResourceGroupName | Should -Be $TestRGName
         }
     }
 }

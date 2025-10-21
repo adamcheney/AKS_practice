@@ -53,8 +53,12 @@ $config = @{
 }
 
 # --- Install PSResourceGet v3 ---
-if (-not (Get-Module -ListAvailable -Name Microsoft.PowerShell.PSResourceGet)) {
-    Install-Module -Name Microsoft.PowerShell.PSResourceGet -Force -Scope CurrentUser
+$PSResourceGetVersion = '1.1.1'
+$PSResourceGet = Get-Module -Name Microsoft.PowerShell.PSResourceGet -ListAvailable
+if (-not ($PSResourceGet | Where-Object Version -eq $PSResourceGetVersion)) {
+    Install-Module -Name Microsoft.PowerShell.PSResourceGet `
+                   -RequiredVersion $PSResourceGetVersion `
+                   -Force -Scope CurrentUser -Required
 }
 # --- Dependency Modules ---
 $Dependencies = (Import-PowerShellDataFile -Path (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')).RequiredModules
@@ -113,7 +117,7 @@ function Set-AzResourceGroup {
         This function is idempotent.
     .PARAMETER ResourceGroupName
         The name of the Resource Group to create or verify.
-    .PARAMETER RGLocation
+    .PARAMETER Location
         The Azure location/region where the Resource Group should reside (e.g., 'uksouth').
     #>
 
@@ -123,11 +127,11 @@ function Set-AzResourceGroup {
         [string]$ResourceGroupName,
 
         [Parameter(Mandatory=$true)]
-        [string]$RGLocation
+        [string]$Location
     )
 
     begin {
-        Write-Verbose "Attempting to create or verify Resource Group: $ResourceGroupName in $RGLocation"
+        Write-Verbose "Attempting to create or verify Resource Group: $ResourceGroupName in $Location"
     }
 
     process {
@@ -135,7 +139,7 @@ function Set-AzResourceGroup {
             if ($PSCmdlet.ShouldProcess("Resource Group '$ResourceGroupName'", "Create")) {
                 Write-Host "Creating Resource Group '$ResourceGroupName'..."
                 try {
-                    New-AzResourceGroup -Name $ResourceGroupName -Location $RGLocation -Force -ErrorAction Stop
+                    New-AzResourceGroup -Name $ResourceGroupName -Location $Location -Force -ErrorAction Stop
                     Write-Host "Resource Group '$ResourceGroupName' created successfully." -ForegroundColor Green
                 }
                 catch {
