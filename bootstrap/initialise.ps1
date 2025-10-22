@@ -1,92 +1,25 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Common parameters and reusable functions.
+    Initialises PowerShell environment
 .DESCRIPTION
-    The bootstrapping scripts can dot-source this file to reuse common configuration variables and functions.
-    These functions:
-    - create resource group
-    - register resource providers
-    - create storage account
-    - create storage blob
-    - create keyvault
-    - create self-signed X.509 cert in .pfx and .der format
-    - create service principal
-    - add certificate to ad app registration corresponding to service principal
-    - grant key vault certificates officer role to service principal
-    - import the pfx to the keyvault
-    - create container for terraform backend
-    - grant service principal access to container
-.EXAMPLE
-    Example command showing typical usage:
-    .\MyScript.ps1 -Name1 "Value" -Name2 10
+    The bootstrapping scripts can dot-source this file to initialise.
+    Also enforces TLS1.2 for secure connections.
+    This function:
+    - Get-InfraConfig - returns the config hash
+    These cmdlets:
+    - Set-PSResourceGetv3 - ensures PSResourceGet v3 is installed and imported
+    - Ensure-ModuleVersion - ensures a specific module and version is imported
+    - Import-BootstrapDependencies - imports required modules from a psd1 file
+    - Set-AzureContext - ensures Azure context exists (logs in if not)
 .NOTES
     Any additional information, like dependencies or version history.
 #>
 
 # --- Enforce TLS1.2 ---
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-# Dot-source initialise script
-. (Join-Path -Path $PSScriptRoot -ChildPath 'initialise.ps1')
-# Initilalise dependencies
-Initialise-Bootstrap 
-
-# --- Configuration Variables ---
-
-function Get-InfraConfig {
-    return @{
-        resourceGroup = @{
-            name = $env:AZURE_RG_NAME ?? "cheneyaw-aks-iac"
-            location = $env:AZURE_LOCATION ?? "uksouth"
-        }
-        storageAccount = @{
-            name = $env:AZURE_STORAGE_NAME ?? "cheneyaw-aks-iacbackend$(Get-Random -Minimum 1000 -Maximum 9999)"
-            sku = "Standard_LRS"
-        }
-        terraform = @{
-            containerName = "tfstate"
-            stateFile = "aks.tfstate"
-        }
-        pulumi = @{
-            containerName = "pulumistate"
-        }
-    }
-}
 
 # --- Initialise ---
-
-
-function Set-AzureContext {
-    <#
-    .SYNOPSIS
-        Ensures Azure context exists.
-    .DESCRIPTION
-        Checks if there is an existing Azure context; if not, it initiates a login.
-    #>
-    [CmdletBinding()]
-    param ()
-
-    begin {
-        Write-Verbose "Checking Azure context..."
-    }
-
-    process {
-# --- Log in to Azure if not already ---
-if (-not (Get-AzContext -ErrorAction SilentlyContinue)) {
-    Write-Host "No Azure context found. Initiating login..." -ForegroundColor Yellow
-    try {
-        Connect-AzAccount -ErrorAction Stop
-        Write-Host "Logged in to Azure successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Error "Azure login failed. Error: $($_.Exception.Message)"
-        throw # Re-throw to stop the script
-    }
-}
-else {
-    Write-Host "Azure context exists - already logged in." -ForegroundColor Cyan
-}
-
 
 function Set-PSResourceGetv3 {
     <#
@@ -258,98 +191,25 @@ function Import-BootstrapDependencies {
         Write-Host "All dependencies from '$DependencyFile' are installed and imported." -ForegroundColor Green
     }
 }
-function Set-AzureContext {
+
+function Initialise-Bootstrap {
     <#
     .SYNOPSIS
-        Ensures Azure context exists.
+        Initialises bootstrapping process
     .DESCRIPTION
-        Checks if there is an existing Azure context; if not, it initiates a login.
+        Downloads PSResourceGet v3.
+        Reads dependencies from psd1 file and installs and imports.
+    .PARAMETER PSResourceGetVersion
+        The version of PSResourceGet to install - defaults to '1.1.1'.
+    .PARAMETER DependencyFile
+        The path of the dependencies psd1 file - defaults to 'dependencies.psd1' in the same directory as this script.
     #>
-    [CmdletBinding()]
-    param ()
-
-    begin {
-        Write-Verbose "Checking Azure context..."
-    }
-
-    process {
-# --- Log in to Azure if not already ---
-if (-not (Get-AzContext -ErrorAction SilentlyContinue)) {
-    Write-Host "No Azure context found. Initiating login..." -ForegroundColor Yellow
-    try {
-        Connect-AzAccount -ErrorAction Stop
-        Write-Host "Logged in to Azure successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Error "Azure login failed. Error: $($_.Exception.Message)"
-        throw # Re-throw to stop the script
-    }
-}
-else {
-    Write-Host "Azure context exists - already logged in." -ForegroundColor Cyan
-}
-
-# --- Reusable Functions ---
-function Set-AzResourceGroup {
-    <#
-    .SYNOPSIS
-        Creates the foundational Azure Resource Group.
-    .DESCRIPTION
-        Ensures the specified Resource Group exists at the specified location.
-        This function is idempotent.
-    .PARAMETER ResourceGroupName
-        The name of the Resource Group to create or verify.
-    .PARAMETER Location
-        The Azure location/region where the Resource Group should reside (e.g., 'uksouth').
-    #>
-
-    [CmdletBinding(SupportsShouldProcess)]
+    [CmdletBinding()
     param (
-        [Parameter(Mandatory=$true)]
-        [string]$ResourceGroupName,
-
-        [Parameter(Mandatory=$true)]
-        [string]$Location
+        [string]$PSResourceGetVersion = '1.1.1',
+        [string]$DependenciesPath = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
     )
-
-    begin {
-        Write-Verbose "Attempting to create or verify Resource Group: $ResourceGroupName in $Location"
-    }
-
-    process {
-        $resourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
-        if (-not ($resourceGroup)) {
-            if ($PSCmdlet.ShouldProcess("Resource Group '$ResourceGroupName'", "Create")) {
-                Write-Host "Creating Resource Group '$ResourceGroupName'..."
-                try {
-                    $resourceGroup = New-AzResourceGroup -Name $ResourceGroupName -Location $Location -Force -ErrorAction Stop
-                    Write-Host "Resource Group '$ResourceGroupName' created successfully." -ForegroundColor Green
-                }
-                catch {
-                    Write-Error "Failed to create Resource Group '$ResourceGroupName'. Error: $($_.Exception.Message)"
-                    throw
-                }
-            }
-        }
-        else {
-            Write-Host "Resource Group '$ResourceGroupName' already exists. Verified." -ForegroundColor Yellow
-        }
-    }
-
-    end {
-        Write-Output $resourceGroup
-    }
+    
+    Set-PSResourceGetv3 -Version $PSResourceGetVersion
+    Import-BootstrapDependencies -DependencyFile $DependenciesPath
 }
-
-# function Set-AzIaCBackendStorage {
-#     <#
-#     .SYNOPSIS
-#         Sets up storage for IaC backends
-#     .DESCRIPTION
-#         Registers the Microsoft.Storage provider, creates the Azure Storage Account and a storage blob.
-#     #>
-#     [CmdletBinding()]
-#     param (
-#         # OptionalParameters
-#     )
-# }
