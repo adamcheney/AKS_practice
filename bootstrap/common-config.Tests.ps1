@@ -39,7 +39,7 @@ Describe "Set-AzResourceGroup Mocked Function Tests" -Tag 'Unit' {
             $result.ResourceGroupName | Should -Be $TestRGName
             Assert-MockCalled New-AzResourceGroup -Times 1
             Assert-MockCalled Get-AzResourceGroup -Times 1
-    }
+        }
     }
 
     Context "When Resource Group Already Exists (Idempotency Test)" {

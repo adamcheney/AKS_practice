@@ -29,7 +29,7 @@
 # Dot-source initialise script
 . (Join-Path -Path $PSScriptRoot -ChildPath 'initialise.ps1')
 # Initilalise dependencies
-Initialise-Bootstrap 
+Initialize-Bootstrap 
 
 # --- Configuration Variables ---
 
@@ -102,7 +102,7 @@ function Set-PSResourceGetv3 {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter]
-        [string]$Version = '1.1.1'
+        [String]$Version = '1.1.1'
     )
 
     begin {
@@ -147,10 +147,10 @@ function Ensure-ModuleVersion {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Mandatory=$true)]
-        [string]$ModuleName,
+        [String]$ModuleName,
 
         [Parameter(Mandatory=$true)]
-        [string]$ModuleVersion
+        [String]$ModuleVersion
     )
 
     begin {
@@ -207,7 +207,7 @@ function Import-BootstrapDependencies {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter]
-        [string]$DependencyFile = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
+        [String]$DependencyFile = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
     )
 
     begin {
@@ -306,10 +306,10 @@ function Set-AzResourceGroup {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Mandatory=$true)]
-        [string]$ResourceGroupName,
+        [String]$ResourceGroupName,
 
         [Parameter(Mandatory=$true)]
-        [string]$Location
+        [String]$Location
     )
 
     begin {

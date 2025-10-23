@@ -34,8 +34,8 @@ function Set-PSResourceGetv3 {
 
     [CmdletBinding(SupportsShouldProcess)]
     param (
-        [Parameter]
-        [string]$Version = '1.1.1'
+        [Parameter()]
+        [String]$Version = '1.1.1'
     )
 
     begin {
@@ -48,7 +48,7 @@ function Set-PSResourceGetv3 {
             if ($PSCmdlet.ShouldProcess("PSResourceGet", "Install version $Version")) {
                 Install-Module -Name Microsoft.PowerShell.PSResourceGet `
                             -RequiredVersion $Version `
-                            -Force -Scope CurrentUser -Required
+                            -Force -Scope CurrentUser
             }
         }
         # Ensure I'm using the expected version
@@ -80,10 +80,10 @@ function Ensure-ModuleVersion {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Mandatory=$true)]
-        [string]$ModuleName,
+        [String]$ModuleName,
 
         [Parameter(Mandatory=$true)]
-        [string]$ModuleVersion
+        [String]$ModuleVersion
     )
 
     begin {
@@ -94,12 +94,12 @@ function Ensure-ModuleVersion {
         # Check to see if the module is already installed and error if not
         $installed = Get-Module -Name $ModuleName -ListAvailable | Where-Object Version -eq $ModuleVersion
         if (-not $installed) {
-            throw "Module '$ModuleName' version '$ModuleVersion' is not installed. Please install it before proceeding."
+            throw "Module '$ModuleName' version '$ModuleVersion' not installed."
         }
         # Check the loaded version
         $loadedModule = Get-Module -Name $ModuleName
-        if ($loadedModule and ($loadedModule.Version -ne $ModuleVersion)) {
-            Write-Verbose "Unloading module '$ModuleName' version $($loadedModule.Version) and importing version $ModuleVersion" -ForegroundColor Yellow
+        if ($loadedModule -and ($loadedModule.Version -ne $ModuleVersion)) {
+            Write-Verbose "Unloading module '$ModuleName' version $($loadedModule.Version) and importing version $ModuleVersion"
             if ($PSCmdlet.ShouldProcess("Module $ModuleName", "Remove version $loadedModule.Version")) {
                 try {
                     Remove-Module -Name $ModuleName -Force
@@ -139,8 +139,8 @@ function Import-BootstrapDependencies {
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param (
-        [Parameter]
-        [string]$DependencyFile = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
+        [Parameter(Mandatory=$false)]
+        [String]$DependencyFile = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
     )
 
     begin {
@@ -152,8 +152,18 @@ function Import-BootstrapDependencies {
         if (-not (Test-Path -Path $DependencyFile)) {
             throw "Dependency file '$DependencyFile' not found."
         }
-        $Dependencies = (Import-PowerShellDataFile -Path $DependencyFile).RequiredModules
-        $Dependencies | ForEach-Object {
+        try {
+            $Dependencies = (Import-PowerShellDataFile -Path $DependencyFile)
+        }
+        catch {
+            Throw "Failed to import dependency file '$DependencyFile'. Error: $($_.Exception.Message)"
+        }
+        if (-not $Dependencies.RequiredModules){
+            # Might be an empty file of empty list of dependencies
+            Write-Information "No RequiredModules found in '$DependencyFile'. Nothing to import."
+            return
+        }
+        $Dependencies.RequiredModules | ForEach-Object {
             $Name = $_.ModuleName
             $Version = $_.ModuleVersion
             # Use -ListAvailable to check if module installed system-wide, not just current session.
@@ -192,7 +202,7 @@ function Import-BootstrapDependencies {
     }
 }
 
-function Initialise-Bootstrap {
+function Initialize-Bootstrap {
     <#
     .SYNOPSIS
         Initialises bootstrapping process
@@ -204,10 +214,10 @@ function Initialise-Bootstrap {
     .PARAMETER DependencyFile
         The path of the dependencies psd1 file - defaults to 'dependencies.psd1' in the same directory as this script.
     #>
-    [CmdletBinding()
+    [CmdletBinding()]
     param (
-        [string]$PSResourceGetVersion = '1.1.1',
-        [string]$DependenciesPath = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
+        [String]$PSResourceGetVersion = '1.1.1',
+        [String]$DependenciesPath = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
     )
     
     Set-PSResourceGetv3 -Version $PSResourceGetVersion
