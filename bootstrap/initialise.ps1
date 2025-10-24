@@ -58,8 +58,8 @@ function Set-PSResourceGetv3 {
     }
 
     end {
-        Write-Host "PSResourceGet v$Version is installed and imported." -ForegroundColor Green
-        return $importPSResourceGet
+        Write-Verbose "PSResourceGet v$Version is installed and imported."
+        $importPSResourceGet
     }
 }
 
@@ -122,8 +122,8 @@ function Ensure-ModuleVersion {
     }
 
     end {
-        Write-Host "Module '$ModuleName' version '$ModuleVersion' is imported successfully." -ForegroundColor Green
-        return $import
+        Write-Verbose "Module '$ModuleName' version '$ModuleVersion' is imported successfully."
+        $import
     }
 }
 
@@ -153,17 +153,17 @@ function Import-BootstrapDependencies {
             throw "Dependency file '$DependencyFile' not found."
         }
         try {
-            $Dependencies = (Import-PowerShellDataFile -Path $DependencyFile)
+            $Dependencies = (Import-PowerShellDataFile -Path $DependencyFile).RequiredModules
         }
         catch {
             Throw "Failed to import dependency file '$DependencyFile'. Error: $($_.Exception.Message)"
         }
-        if (-not $Dependencies.RequiredModules){
+        if (-not $Dependencies){
             # Might be an empty file of empty list of dependencies
             Write-Information "No RequiredModules found in '$DependencyFile'. Nothing to import."
             return
         }
-        $Dependencies.RequiredModules | ForEach-Object {
+        $Dependencies| ForEach-Object {
             $Name = $_.ModuleName
             $Version = $_.ModuleVersion
             # Use -ListAvailable to check if module installed system-wide, not just current session.
@@ -171,7 +171,7 @@ function Import-BootstrapDependencies {
 
             # Compare installed version to required version.
             if (-not ($InstalledModule | Where-Object Version -eq $Version)) {
-                Write-Host "Installing module '$Name' version '$Version'..." -ForegroundColor Yellow
+                Write-Verbose "Installing module '$Name' version '$Version'..."
                 if ($PSCmdlet.ShouldProcess("PSResource $Name", "Install PSResource version '$Version'")) {
                     try {
                         $InstallParams = @{
@@ -181,7 +181,7 @@ function Import-BootstrapDependencies {
                             Repository = 'PSGallery'
                         }
                         Install-PSResource @InstallParams -ErrorAction Stop
-                        Write-Host "Module '$Name' installed successfully." -ForegroundColor Green
+                        Write-Verbose "Module '$Name' installed successfully."
                     }
                     catch {
                         Write-Error "Failed to install module '$Name'. Error: $($_.Exception.Message)"
@@ -190,7 +190,7 @@ function Import-BootstrapDependencies {
                 }
             }
             else {
-                Write-Host "Module '$Name' (v$($InstalledModule.Version)) already meets requirement (v$Version). Skipping installation." -ForegroundColor Cyan
+                Write-Verbose "Module '$Name' (v$($InstalledModule.Version)) already meets requirement (v$Version). Skipping installation."
             }
             # Ensure the required version is imported
             Ensure-ModuleVersion -ModuleName $Name -ModuleVersion $Version
@@ -198,7 +198,7 @@ function Import-BootstrapDependencies {
     }
 
     end {
-        Write-Host "All dependencies from '$DependencyFile' are installed and imported." -ForegroundColor Green
+        Write-Verbose "All dependencies from '$DependencyFile' are installed and imported."
     }
 }
 

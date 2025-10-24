@@ -26,15 +26,11 @@
 
 # --- Enforce TLS1.2 ---
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-# Dot-source initialise script
-. (Join-Path -Path $PSScriptRoot -ChildPath 'initialise.ps1')
-# Initilalise dependencies
-Initialize-Bootstrap 
 
 # --- Configuration Variables ---
 
 function Get-InfraConfig {
-    return @{
+     @{
         resourceGroup = @{
             name = $env:AZURE_RG_NAME ?? "cheneyaw-aks-iac"
             location = $env:AZURE_LOCATION ?? "uksouth"
@@ -53,8 +49,6 @@ function Get-InfraConfig {
     }
 }
 
-# --- Initialise ---
-
 
 function Set-AzureContext {
     <#
@@ -63,231 +57,37 @@ function Set-AzureContext {
     .DESCRIPTION
         Checks if there is an existing Azure context; if not, it initiates a login.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param ()
 
     begin {
         Write-Verbose "Checking Azure context..."
+        $currentContext = $null
     }
 
     process {
-# --- Log in to Azure if not already ---
-if (-not (Get-AzContext -ErrorAction SilentlyContinue)) {
-    Write-Host "No Azure context found. Initiating login..." -ForegroundColor Yellow
-    try {
-        Connect-AzAccount -ErrorAction Stop
-        Write-Host "Logged in to Azure successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Error "Azure login failed. Error: $($_.Exception.Message)"
-        throw # Re-throw to stop the script
-    }
-}
-else {
-    Write-Host "Azure context exists - already logged in." -ForegroundColor Cyan
-}
-
-
-function Set-PSResourceGetv3 {
-    <#
-    .SYNOPSIS
-        Imports and installs PSResourceGet v3.
-    .DESCRIPTION
-        Checks to see if the specified version of PSResourceGet is installed, installs it if missing, and imports it.
-        This function is idempotent.
-    .PARAMETER Verson
-        The specific version to Install/Import - defaults to '1.1.1'.
-    #>
-
-    [CmdletBinding(SupportsShouldProcess)]
-    param (
-        [Parameter]
-        [String]$Version = '1.1.1'
-    )
-
-    begin {
-        Write-Verbose "Installing and importing PSResourceGet v3, version $Version"
-    }
-
-    process {
-        $PSResourceGet = Get-Module -Name Microsoft.PowerShell.PSResourceGet -ListAvailable
-        if (-not ($PSResourceGet | Where-Object Version -eq $Version)) {
-            if ($PSCmdlet.ShouldProcess("PSResourceGet", "Install version $Version")) {
-                Install-Module -Name Microsoft.PowerShell.PSResourceGet `
-                            -RequiredVersion $Version `
-                            -Force -Scope CurrentUser -Required
-            }
-        }
-        # Ensure I'm using the expected version
-        if ($PSCmdlet.ShouldProcess("PSResourceGet","Ensure module version $Version is imported")) {
-            $importPSResourceGet = Ensure-ModuleVersion -ModuleName 'Microsoft.PowerShell.PSResourceGet' -ModuleVersion $Version
-        }
-    }
-
-    end {
-        Write-Host "PSResourceGet v$Version is installed and imported." -ForegroundColor Green
-        return $importPSResourceGet
-    }
-}
-
-# --- Dependency Modules ---
-function Ensure-ModuleVersion {
-    <#
-    .SYNOPSIS
-        Ensures a specific PowerShell module and version is imported - throws an error if not installed.
-    .DESCRIPTION
-        Checks if the specified module and version is imported; removes and reimports if a different version is loaded.
-        If the module/version is not installed, it throws an error.
-        This function is idempotent.
-    .PARAMETER ModuleName
-        The name of the PowerShell module.
-    .PARAMETER ModuleVersion
-        The required version of the module.
-    #>
-    [CmdletBinding(SupportsShouldProcess)]
-    param (
-        [Parameter(Mandatory=$true)]
-        [String]$ModuleName,
-
-        [Parameter(Mandatory=$true)]
-        [String]$ModuleVersion
-    )
-
-    begin {
-        Write-Verbose "Ensuring module '$ModuleName' version '$ModuleVersion' is imported into session."
-    }
-
-    process {
-        # Check to see if the module is already installed and error if not
-        $installed = Get-Module -Name $ModuleName -ListAvailable | Where-Object Version -eq $ModuleVersion
-        if (-not $installed) {
-            throw "Module '$ModuleName' version '$ModuleVersion' is not installed. Please install it before proceeding."
-        }
-        # Check the loaded version
-        $loadedModule = Get-Module -Name $ModuleName
-        if ($loadedModule and ($loadedModule.Version -ne $ModuleVersion)) {
-            Write-Verbose "Unloading module '$ModuleName' version $($loadedModule.Version) and importing version $ModuleVersion" -ForegroundColor Yellow
-            if ($PSCmdlet.ShouldProcess("Module $ModuleName", "Remove version $loadedModule.Version")) {
-                try {
-                    Remove-Module -Name $ModuleName -Force
-                }
-                catch {
-                    Write-Error "Failed to remove module '$ModuleName', version '$loadedModule.Version'. Error: $($_.Exception.Message)"
-                }
-            }
-        }
-        if ($PSCmdlet.ShouldProcess("Module $ModuleName", "Import version '$ModuleVersion'")) {
+        $currentContext = Get-AzContext -ErrorAction SilentlyContinue
+        if (-not ($currentContext)) {
+            Write-Verbose "No Azure context found. Initiating login..." 
             try {
-                # Using $installed as this is the correct module and version already found on the system
-                $import = Import-Module $installed -ErrorAction SilentlyContinue -PassThru
+                if ($PSCmdlet.ShouldProcess("AzAccount", "Remove version $loadedModule.Version")) {
+                    $currentContext = Connect-AzAccount -ErrorAction Stop
+                    Write-Verbose "Logged in to Azure successfully." 
+                }            
             }
             catch {
-                Write-Error "Failed to import module '$ModuleName', version '$ModuleVersion'. Error: $($_.Exception.Message)"
-                throw
+                Write-Error "Azure login failed. Error: $($_.Exception.Message)"
+                throw # Re-throw to stop the script
             }
+        }
+        else {
+            Write-Verbose "Azure context exists - already logged in." 
         }
     }
 
-    end {
-        Write-Host "Module '$ModuleName' version '$ModuleVersion' is imported successfully." -ForegroundColor Green
-        return $import
-    }
+    end { $currentContext }
 }
 
-function Import-BootstrapDependencies {
-    <#
-    .SYNOPSIS
-        Imports and installs required PowerShell modules.
-    .DESCRIPTION
-        Reads the dependencies from a psd1 file and ensures they are installed and imported.
-        This function is idempotent.
-    .PARAMETER DependencyFile
-        The path of the dependencies psd1 file - defaults to 'dependencies.psd1' in the same directory as this script.
-    #>
-    [CmdletBinding(SupportsShouldProcess)]
-    param (
-        [Parameter]
-        [String]$DependencyFile = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
-    )
-
-    begin {
-        Write-Verbose "Importing dependencies from $DependencyFile"
-        Set-PSResourceGetv3 -Version '1.1.1'
-    }
-
-    process {
-        if (-not (Test-Path -Path $DependencyFile)) {
-            throw "Dependency file '$DependencyFile' not found."
-        }
-        $Dependencies = (Import-PowerShellDataFile -Path $DependencyFile).RequiredModules
-        $Dependencies | ForEach-Object {
-            $Name = $_.ModuleName
-            $Version = $_.ModuleVersion
-            # Use -ListAvailable to check if module installed system-wide, not just current session.
-            $InstalledModule = Get-Module -Name $Name -ListAvailable -ErrorAction SilentlyContinue
-
-            # Compare installed version to required version.
-            if (-not ($InstalledModule | Where-Object Version -eq $Version)) {
-                Write-Host "Installing module '$Name' version '$Version'..." -ForegroundColor Yellow
-                if ($PSCmdlet.ShouldProcess("PSResource $Name", "Install PSResource version '$Version'")) {
-                    try {
-                        $InstallParams = @{
-                            Name = $Name
-                            Version = $Version
-                            Scope = 'CurrentUser'
-                            Repository = 'PSGallery'
-                        }
-                        Install-PSResource @InstallParams -ErrorAction Stop
-                        Write-Host "Module '$Name' installed successfully." -ForegroundColor Green
-                    }
-                    catch {
-                        Write-Error "Failed to install module '$Name'. Error: $($_.Exception.Message)"
-                        throw # Re-throw to stop the script
-                    }
-                }
-            }
-            else {
-                Write-Host "Module '$Name' (v$($InstalledModule.Version)) already meets requirement (v$Version). Skipping installation." -ForegroundColor Cyan
-            }
-            # Ensure the required version is imported
-            Ensure-ModuleVersion -ModuleName $Name -ModuleVersion $Version
-        }
-    }
-
-    end {
-        Write-Host "All dependencies from '$DependencyFile' are installed and imported." -ForegroundColor Green
-    }
-}
-function Set-AzureContext {
-    <#
-    .SYNOPSIS
-        Ensures Azure context exists.
-    .DESCRIPTION
-        Checks if there is an existing Azure context; if not, it initiates a login.
-    #>
-    [CmdletBinding()]
-    param ()
-
-    begin {
-        Write-Verbose "Checking Azure context..."
-    }
-
-    process {
-# --- Log in to Azure if not already ---
-if (-not (Get-AzContext -ErrorAction SilentlyContinue)) {
-    Write-Host "No Azure context found. Initiating login..." -ForegroundColor Yellow
-    try {
-        Connect-AzAccount -ErrorAction Stop
-        Write-Host "Logged in to Azure successfully." -ForegroundColor Green
-    }
-    catch {
-        Write-Error "Azure login failed. Error: $($_.Exception.Message)"
-        throw # Re-throw to stop the script
-    }
-}
-else {
-    Write-Host "Azure context exists - already logged in." -ForegroundColor Cyan
-}
 
 # --- Reusable Functions ---
 function Set-AzResourceGroup {
@@ -314,16 +114,17 @@ function Set-AzResourceGroup {
 
     begin {
         Write-Verbose "Attempting to create or verify Resource Group: $ResourceGroupName in $Location"
+        $resourceGroup = $null
     }
 
     process {
         $resourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
         if (-not ($resourceGroup)) {
             if ($PSCmdlet.ShouldProcess("Resource Group '$ResourceGroupName'", "Create")) {
-                Write-Host "Creating Resource Group '$ResourceGroupName'..."
+                Write-Verbose "Creating Resource Group '$ResourceGroupName'..."
                 try {
                     $resourceGroup = New-AzResourceGroup -Name $ResourceGroupName -Location $Location -Force -ErrorAction Stop
-                    Write-Host "Resource Group '$ResourceGroupName' created successfully." -ForegroundColor Green
+                    Write-Verbose "Resource Group '$ResourceGroupName' created successfully." 
                 }
                 catch {
                     Write-Error "Failed to create Resource Group '$ResourceGroupName'. Error: $($_.Exception.Message)"
@@ -332,15 +133,71 @@ function Set-AzResourceGroup {
             }
         }
         else {
-            Write-Host "Resource Group '$ResourceGroupName' already exists. Verified." -ForegroundColor Yellow
+            Write-Verbose "Resource Group '$ResourceGroupName' already exists. Verified." 
+        }
+    }
+
+    end { $resourceGroup }
+}
+
+function Register-RequiredAzResourceProviders {
+    <#
+    .SYNOPSIS
+        Registers necessary Azure Resource Providers.
+    .DESCRIPTION
+        Registers required Azure Resource Providers for the deployment.
+    .PARAMETER DependencyFile
+        Path to the dependencies file listing required resource providers.
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param (
+        [Parameter(Mandatory=$false)]
+        [String]$DependencyFile = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
+    )
+
+    begin {
+        Write-Verbose "Loading required Azure Resource Providers from '$DependencyFile'..."
+        $requiredProviders = @()
+    }
+
+    process {
+        if (-not (Test-Path -Path $DependencyFile)) {
+            throw "Dependency file '$DependencyFile' not found."
+        }
+        try {
+            $Providers = (Import-PowerShellDataFile -Path $DependencyFile).RequiredProviders
+        }
+        catch {
+            Throw "Failed to import dependency file '$DependencyFile'. Error: $($_.Exception.Message)"
+        }
+        if (-not $Providers){
+            # The list of required providers should not be empty - throw an error
+            throw "No RequiredProviders found in '$DependencyFile'. Nothing to register."
+        }
+        Write-Host "Dependency file: $DependencyFile" # <- DEBUG: remove
+        foreach ($providerName in $Providers) {
+            $notRegistered = (Get-AzResourceProvider -ListAvailable `
+              | Where-Object ProviderNamespace -eq $providerName ).RegistrationState -eq "NotRegistered"
+            $temp = (Get-AzResourceProvider -ListAvailable `
+              | Where-Object ProviderNamespace -eq $providerName )
+            Write-Host "    Provider: $providerName, State: $($temp.RegistrationState)" # <- DEBUG: remove
+            if ($notRegistered) {
+                Write-Verbose "Registering Resource Provider: '$providerName'..."
+                Write-Host "Registering Resource Provider: $providerName" # <- DEBUG: remove
+                Register-AzResourceProvider -ProviderNamespace $providerName -ErrorAction Stop
+            }
+            else {
+                Write-Verbose "Resource Provider '$providerName' is already registered."
+                Write-Host "Resource Provider '$providerName' is already registered." # <- DEBUG: remove
+            }
         }
     }
 
     end {
-        Write-Output $resourceGroup
+        Write-Verbose "All required Azure Resource Providers have been registered."
     }
+    
 }
-
 # function Set-AzIaCBackendStorage {
 #     <#
 #     .SYNOPSIS
