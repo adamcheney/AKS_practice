@@ -38,6 +38,8 @@ Describe "Set-AzureContext" -Tag 'Unit' {
                     Tenant = "testTenant"
                 }
             }
+        }
+        BeforeEach {
             $result = Set-AzureContext
         }
         It "Should run Connect-AzAccount" {
@@ -70,6 +72,8 @@ Describe "Set-AzureContext" -Tag 'Unit' {
                 }
             }
             Mock Connect-AzAccount {}
+        }
+        BeforeEach {
             $result = Set-AzureContext
         }
         It "Should NOT run Connect-AzAccount" {
@@ -227,6 +231,8 @@ Describe "Register-RequiredAzResourceProviders" -Tag 'Unit' {
                     }
                 )
             }
+        }
+        BeforeEach {
             Register-RequiredAzResourceProviders -DependencyFile './alldeps.psd1'
         }
         It "Should register each required provider" {
@@ -325,6 +331,8 @@ Describe "Register-RequiredAzResourceProviders" -Tag 'Unit' {
                     }
                 )
             }
+        }
+        BeforeEach {
             Register-RequiredAzResourceProviders -DependencyFile './somedeps.psd1'
         }
         It "Should not call Register-AzResourceProvider for already registered providers" {

@@ -49,7 +49,6 @@ function Get-InfraConfig {
     }
 }
 
-
 function Set-AzureContext {
     <#
     .SYNOPSIS
