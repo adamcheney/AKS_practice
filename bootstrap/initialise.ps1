@@ -5,13 +5,10 @@
 .DESCRIPTION
     The bootstrapping scripts can dot-source this file to initialise.
     Also enforces TLS1.2 for secure connections.
-    This function:
-    - Get-InfraConfig - returns the config hash
     These cmdlets:
     - Set-PSResourceGetv3 - ensures PSResourceGet v3 is installed and imported
     - Ensure-ModuleVersion - ensures a specific module and version is imported
     - Import-BootstrapDependencies - imports required modules from a psd1 file
-    - Set-AzureContext - ensures Azure context exists (logs in if not)
 .NOTES
     Any additional information, like dependencies or version history.
 #>

@@ -1,10 +1,12 @@
+**/.vscode
+**/*.code-workspace
+**/.DS_Store
 **/.env
 **/*.crt
 **/*.key
 **/*.pem
-**/.vscode
-**/.DS_Store
+**/*.der
+**/*.pfx
 **/.terraform
-*.tfstate
-*.tfstate*
-**/*.code-workspace
+**/*.tfstate*
+**/coverage.xml
