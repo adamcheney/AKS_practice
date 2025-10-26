@@ -41,7 +41,7 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
     }
     Context "When not installed" {
         BeforeAll {
-            Mock Get-Module { $null }
+            Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
         }
         It "Should install and import PSResourceGet v3" {
             # Call the function
@@ -59,10 +59,12 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
     Context "Correct version already installed" {
         BeforeAll {
             Mock Get-Module {
-                [PSCustomObject]@{
-                    Name = 'Microsoft.PowerShell.PSResourceGet'
-                    Version = [Version]'1.1.1'
-                }
+                @(
+                    [PSCustomObject]@{
+                        Name = 'Microsoft.PowerShell.PSResourceGet'
+                        Version = [Version]'1.1.1'
+                    }
+                )
             }
         }
         It "Should not install PSResourceGet v3" {
@@ -81,14 +83,15 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
 }
 
 Describe "Ensure-ModuleVersion" -Tag 'Unit' {
-    Context "When module is not installed" {}
+    Context "When module is not installed" {
         BeforeAll {
-            Mock Get-Module { $null }
+            Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
         }
         It "Should throw an error" {
-            { Ensure-ModuleVersion -ModuleName 'Null' -ModuleVersion '0.0' } `
-              | Should -Throw "Module 'Null' version '0.0' not installed."
+            { Ensure-ModuleVersion -ModuleName 'Null' -ModuleVersion '0.0' } |
+                Should -Throw "Module 'Null' version '0.0' not installed."
         }
+    }
     Context "When installed incorrect version" {
         BeforeAll {
             Mock Get-Module {
@@ -101,8 +104,8 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
             }
         }
         It "Should throw an error" {
-            { Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '5.0.0' } `
-              | Should -Throw "Module 'Test' version '5.0.0' not installed."
+            { Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '5.0.0' } |
+                Should -Throw "Module 'Test' version '5.0.0' not installed."
         }
     }
     Context "When module installed none imported" {
@@ -236,8 +239,9 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
             } -ParameterFilter { $ListAvailable }
             Mock Remove-Module { throw "Removal failed" }
             Mock Import-Module {
+                param($args)
                 [PSCustomObject]@{
-                    Name = 'Test';
+                    Name = 'Test'
                     Version = [Version]'4.2.0'
                 }
             }
@@ -281,8 +285,8 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
             Mock Test-Path { $false }
         }
         It "Should throw an error" {
-            { Import-BootstrapDependencies -DependencyFile 'nonexistent.psd1' } `
-              | Should -Throw "Dependency file 'nonexistent.psd1' not found."
+            { Import-BootstrapDependencies -DependencyFile 'nonexistent.psd1' } |
+                Should -Throw "Dependency file 'nonexistent.psd1' not found."
         }
     }
     Context "When file present but empty" {
@@ -325,8 +329,8 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
             Mock Import-PowerShellDataFile { throw "Simulated parse failure" }
         }
         It "Should throw an import error" {
-            { Import-BootstrapDependencies -DependencyFile 'malformed.psd1' } `
-              | Should -Throw "Failed to import dependency file 'malformed.psd1'. Error: Simulated parse failure"
+            { Import-BootstrapDependencies -DependencyFile 'malformed.psd1' } |
+                Should -Throw "Failed to import dependency file 'malformed.psd1'. Error: Simulated parse failure"
         }
     }
     Context "When dependency file has valid module not installed" {
@@ -339,7 +343,7 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
                     )
                 }
             }
-            Mock Get-Module { $null }
+            Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
             Mock Install-PSResource {
                 [PSCustomObject]@{
                     Name = 'Test'
@@ -405,14 +409,14 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
                         )
                     }
                 }
-                Mock Get-Module { $null } -ParameterFilter { $ListAvailable }
+                Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
                 Mock Install-PSResource { throw "Package(s) 'Fail' could not be installed from repository 'PSGallery'." }
                 Mock Write-Verbose {}
-                Mock Write-Error {}
+                Mock Write-Error {
             }
             It "Should throw an error and stop processing" {
-                { Import-BootstrapDependencies -DependencyFile 'fail.psd1' } `
-                  | Should -Throw "Package(s) 'Fail' could not be installed from repository 'PSGallery'."
+                { Import-BootstrapDependencies -DependencyFile 'fail.psd1' } |
+                    Should -Throw "Package(s) 'Fail' could not be installed from repository 'PSGallery'."
                 Assert-MockCalled Write-Verbose -ParameterFilter {
                     $Message -match "Installing module 'Fail' version '1.0.0'..."
                 } -Times 1
@@ -423,6 +427,7 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
                     $Message -match "Failed to install module 'Fail'.*"
                 } -Times 1
             }
+        }
     }
 }
 Describe "Initialize-Bootstrap" -Tag 'Unit' {

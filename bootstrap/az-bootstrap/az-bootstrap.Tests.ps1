@@ -61,7 +61,7 @@ InModuleScope az-bootstrap {
             }
             It "Should throw an error" {
                 { Get-InfraConfig -ConfigPath 'duff.json' } |
-                    Should -Throw -ExpectedMessage "Config file not found at 'duff.json'.*"
+                   Should -Throw -ExpectedMessage "Config file not found at 'duff.json'.*"
             }
         }
         Context "When file is not valid JSON" {
@@ -71,7 +71,7 @@ InModuleScope az-bootstrap {
             }
             It "Should throw an error" {
                 { Get-InfraConfig -ConfigPath 'guff.json' } |
-                    Should -Throw -ExpectedMessage "Invalid JSON in config file 'guff.json'.*"
+                   Should -Throw -ExpectedMessage "Invalid JSON in config file 'guff.json'.*"
             }
         }
     }
@@ -223,8 +223,8 @@ InModuleScope az-bootstrap {
                 Mock Write-Error {}
             }
             It "Should throw an error" {
-                { Set-AzResourceGroup -ResourceGroupName 'testRG' -Location 'testLocation' } `
-                | Should -Throw "Simulated retrieval failure."
+                { Set-AzResourceGroup -ResourceGroupName 'testRG' -Location 'testLocation' } |
+                  Should -Throw "Simulated retrieval failure."
             }
         }
         Context "When New-AzureResourceGroup fails" {
@@ -233,8 +233,8 @@ InModuleScope az-bootstrap {
                 Mock Write-Error {}
             }
             It "Should throw an error" {
-                { Set-AzResourceGroup -ResourceGroupName 'testRG' -Location 'testLocation' } `
-                | Should -Throw "Simulated creation failure."
+                { Set-AzResourceGroup -ResourceGroupName 'testRG' -Location 'testLocation' } |
+                  Should -Throw "Simulated creation failure."
             }
         }
         Context "When called with -WhatIf" {
@@ -311,8 +311,8 @@ InModuleScope az-bootstrap {
                 Mock Test-Path { $false }
             }
             It "Should throw an error" {
-                { Register-RequiredAzResourceProviders -DependencyFile './nonexistent.psd1' } `
-                | Should -Throw "Dependency file './nonexistent.psd1' not found."
+                { Register-RequiredAzResourceProviders -DependencyFile './nonexistent.psd1' } |
+                  Should -Throw "Dependency file './nonexistent.psd1' not found."
             }
         }
         Context "When given a file with no RequiredProviders" {
@@ -328,8 +328,8 @@ InModuleScope az-bootstrap {
                 }
             }
             It "Should throw an error" {
-                { Register-RequiredAzResourceProviders -DependencyFile './emptydeps.psd1' } `
-                | Should -Throw "No RequiredProviders found in './emptydeps.psd1'. Nothing to register."
+                { Register-RequiredAzResourceProviders -DependencyFile './emptydeps.psd1' } |
+                  Should -Throw "No RequiredProviders found in './emptydeps.psd1'. Nothing to register."
             }
         }
         Context "When dependency file import fails" {
@@ -339,7 +339,7 @@ InModuleScope az-bootstrap {
             }
             It "Should throw a descriptive error" {
                 { Register-RequiredAzResourceProviders -DependencyFile './badfile.psd1' } |
-                Should -Throw "Failed to import dependency file './badfile.psd1'. Error: Simulated parse error."
+               Should -Throw "Failed to import dependency file './badfile.psd1'. Error: Simulated parse error."
             }
         }
         Context "When Register-AzResourceProvider fails" {
@@ -366,8 +366,8 @@ InModuleScope az-bootstrap {
                 Mock Register-AzResourceProvider { throw "Simulated registration failure." }
             }
             It "Should throw an error" {
-                { Register-RequiredAzResourceProviders -DependencyFile './deps.psd1' } `
-                | Should -Throw "Simulated registration failure."
+                { Register-RequiredAzResourceProviders -DependencyFile './deps.psd1' } |
+                  Should -Throw "Simulated registration failure."
             }
         }
         Context "When some Resource Providers are already registered" {

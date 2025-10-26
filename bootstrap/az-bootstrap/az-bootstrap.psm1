@@ -219,10 +219,10 @@ function Register-RequiredAzResourceProviders {
             throw "No RequiredProviders found in '$DependencyFile'. Nothing to register."
         }
         foreach ($providerName in $Providers) {
-            $notRegistered = (Get-AzResourceProvider -ListAvailable `
-              | Where-Object ProviderNamespace -eq $providerName ).RegistrationState -eq "NotRegistered"
-            $temp = (Get-AzResourceProvider -ListAvailable `
-              | Where-Object ProviderNamespace -eq $providerName )
+            $notRegistered = (Get-AzResourceProvider -ListAvailable |
+              .  Where-Object ProviderNamespace -eq $providerName ).RegistrationState -eq "NotRegistered"
+            $temp = (Get-AzResourceProvider -ListAvailable |
+              .  Where-Object ProviderNamespace -eq $providerName )
             if ($notRegistered) {
                 Write-Verbose "Registering Resource Provider: '$providerName'..."
                 Register-AzResourceProvider -ProviderNamespace $providerName -ErrorAction Stop

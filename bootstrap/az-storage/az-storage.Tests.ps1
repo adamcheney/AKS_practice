@@ -34,8 +34,8 @@ InModuleScope az-storage {
                 $name | Should -Match '^cheneyawiacb[0-9]{12}$'
             }
             It "Should not throw any errors" {
-                { New-UniqueStorageAccountName -Prefix 'suitable'} `
-                  | Should -Not -Throw
+                { New-UniqueStorageAccountName -Prefix 'suitable'} |
+                    Should -Not -Throw
             }
             It "Should generate unique StorageAccount name" {
                 Mock Get-Date { "12311159590001" } -ParameterFilter { $Format -eq 'MMddHHmmssff' }
@@ -47,19 +47,23 @@ InModuleScope az-storage {
         }
         Context "When passed prefix that is too long" {
             It "Should throw a meaningful error" {
-                { New-UniqueStorageAccountName -Prefix 'therearetoomanycharacters'} `
-                  | Should -Throw -ErrorId "ParameterArgumentValidationError*"
+                { New-UniqueStorageAccountName -Prefix 'therearetoomanycharacters'} |
+                    Should -Throw -ErrorId "ParameterArgumentValidationError*"
             }
         }
         Context "When passed prefix containing proscribed characters" {
             It "Should throw a meaningful error" {
-                { New-UniqueStorageAccountName -Prefix 'Really?'} `
-                  | Should -Throw -ErrorId "ParameterArgumentValidationError*"
+                { New-UniqueStorageAccountName -Prefix 'Really?'} |
+                    Should -Throw -ErrorId "ParameterArgumentValidationError*"
             }
         }
     }
     Describe "Set-BackendStorageAccount" -Tag 'Unit' {
         BeforeAll {
+            Mock Get-AzResourceGroup {
+                param($Name)
+                [PSCustomObject]@{ ResourceGroupName = $Name }
+            }
             Mock New-UniqueStorageAccountName { 'testacct123456789012' } `
                 -ParameterFilter { $Prefix -eq 'testacct' }
             Mock New-AzStorageAccount {
@@ -72,8 +76,9 @@ InModuleScope az-storage {
                 }
             }
             $baseParams = @{
-                ResourceGroupName          = 'test-rg'
-                StorageAccountNamePrefix   = 'testacct'
+                ResourceGroupName        = 'test-rg'
+                StorageAccountNamePrefix = 'testacct'
+                Location                 = 'eastus'
             }
         }
         It "Should be a defined function" {
@@ -83,15 +88,27 @@ InModuleScope az-storage {
             # Ensure it exposes a parameter block (not strictly behavioural, but useful)
             $cmd.Parameters.Keys | Should -Not -BeNullOrEmpty
         }
+        Context "When called with non-existent Resource Group" {
+            BeforeAll {
+                Mock Get-AzResourceGroup { $null } `
+                    -ParameterFilter { $Name -eq 'nonexistent-rg' }
+                $params = $baseParams.clone()
+                $params.ResourceGroupName = 'nonexistent-rg'
+            }
+            It "Should throw an error" {
+                { Set-BackendStorageAccount @params } |
+                   Should -Throw "Resource Group 'nonexistent-rg' does not exist."
+            }
+        }
         Context "When no Storage Account exists" {
             BeforeAll {
                 Mock Get-AzStorageAccount  { $null } `
                     -ParameterFilter { $ResourceGroupName -eq 'test-rg' }
-                $params = $baseParams + @{ Location = 'eastus' }
+                $params = $baseParams.clone()
             }
             It "Should run without error" {
-                { Set-BackendStorageAccount @params } `
-                  | Should -Not -Throw
+                { Set-BackendStorageAccount @params } |
+                    Should -Not -Throw
             }
             It "Should call New-UniqueStorageAccountName" {
                 Set-BackendStorageAccount @params
@@ -121,11 +138,11 @@ InModuleScope az-storage {
                 }
                 Mock Get-AzStorageAccount  { @($existingAcct) } `
                     -ParameterFilter { $ResourceGroupName -eq 'test-rg' }
-                $params = $baseParams + @{ Location = 'eastus' }
+                $params = $baseParams.clone()
             }
             It "Should run without error" {
-                { Set-BackendStorageAccount @params } `
-                  | Should -Not -Throw
+                { Set-BackendStorageAccount @params } |
+                    Should -Not -Throw
             }
             It "Should call New-UniqueStorageAccountName" {
                 Set-BackendStorageAccount @params
@@ -155,11 +172,11 @@ InModuleScope az-storage {
                 }
                 Mock Get-AzStorageAccount  { @($existingAcct) } `
                     -ParameterFilter { $ResourceGroupName -eq 'test-rg' }
-                $params = $baseParams + @{ Location = 'eastus' }
+                $params = $baseParams.clone()
             }
             It "Should run without error" {
-                { Set-BackendStorageAccount @params } `
-                  | Should -Not -Throw
+                { Set-BackendStorageAccount @params } |
+                    Should -Not -Throw
             }
             It "Should NOT call New-UniqueStorageAccountName" {
                 Set-BackendStorageAccount @params
@@ -187,11 +204,11 @@ InModuleScope az-storage {
                 }
                 Mock Get-AzStorageAccount  { @($existingAcct) } `
                     -ParameterFilter { $ResourceGroupName -eq 'test-rg' }
-                $params = $baseParams + @{ Location = 'eastus' }
+                $params = $baseParams.clone()
             }
             It "Should run without error" {
-                { Set-BackendStorageAccount @params } `
-                  | Should -Not -Throw
+                { Set-BackendStorageAccount @params } |
+                    Should -Not -Throw
             }
             It "Should NOT call New-UniqueStorageAccountName" {
                 Set-BackendStorageAccount @params
@@ -224,11 +241,11 @@ InModuleScope az-storage {
                 }
                 Mock Get-AzStorageAccount  { @($acct1, $acct2) } `
                     -ParameterFilter { $ResourceGroupName -eq 'test-rg' }
-                $params = $baseParams + @{ Location = 'eastus' }
+                $params = $baseParams.clone()
             }
             It "Should run without error" {
-                { Set-BackendStorageAccount @params } `
-                  | Should -Not -Throw
+                { Set-BackendStorageAccount @params } |
+                    Should -Not -Throw
             }
             It "Should return the most recent Storage Account" {
                 $storageAccount = Set-BackendStorageAccount @params
@@ -238,22 +255,22 @@ InModuleScope az-storage {
         Context "When Get-AzStorageAccount fails" {
             BeforeAll {
                 Mock Get-AzStorageAccount { throw "Network error" }
-                $params = $baseParams + @{ Location = 'eastus' }
+                $params = $baseParams.clone()
             }
             It "Should throw an error" {
                 { Set-BackendStorageAccount @params } |
-                    Should -Throw "Network error"
+                   Should -Throw "Network error"
             }
         }
         Context "When New-AzStorageAccount fails" {
             BeforeAll {
                 Mock Get-AzStorageAccount { $null }
                 Mock New-AzStorageAccount { throw "Quota exceeded" }
-                $params = $baseParams + @{ Location = 'eastus' }
+                $params = $baseParams.clone()
             }
             It "Should throw an error" {
                 { Set-BackendStorageAccount @params } |
-                    Should -Throw "Quota exceeded"
+                   Should -Throw "Quota exceeded"
             }
         }
         Context "When called with -WhatIf" {
@@ -264,7 +281,7 @@ InModuleScope az-storage {
             }
             It "Should not create storage account" {
                 Set-BackendStorageAccount -ResourceGroupName 'test-rg' -StorageAccountNamePrefix 'test' -Location 'eastus' -WhatIf
-                Should -Invoke New-AzStorageAccount -Times 0
+               Should -Invoke New-AzStorageAccount -Times 0
             }
             It "Should return null" {
                 $result = Set-BackendStorageAccount -ResourceGroupName 'test-rg' -StorageAccountNamePrefix 'test' -Location 'eastus' -WhatIf

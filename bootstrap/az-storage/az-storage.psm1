@@ -2,9 +2,9 @@
 .SYNOPSIS
     Azure Storage helper functions (module).
 .DESCRIPTION
-    Idempotent helpers to generate unique storage account names and ensure a backend storage account exists.
+    Idempotent helpers to generate unique storage account names and ensure a backend
+    storage account exists.
     Intended to be used as a module (Import-Module) by bootstrap scripts and tooling.
-    Dot-sourcing is supported for quick interactive debugging but module import is preferred.
 .EXAMPLE
     # Import the module for production or automated usage
     Import-Module "$PSScriptRoot/az-storage.psm1" -Force
@@ -90,7 +90,10 @@ function Set-BackendStorageAccount {
     )
 
     begin {
-        # nothing needed here
+        # Begin by confirming the Resource Group exists and throwing if not
+        if ( $null -eq (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue) ) {
+            throw "Resource Group '$ResourceGroupName' does not exist."
+        }
     }
     
     process {
