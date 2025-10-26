@@ -3,9 +3,13 @@
 .SYNOPSIS
     Pester unit tests for az-bootstrap module helpers.
 .DESCRIPTION
-    Unit tests for Get-InfraConfig, Set-AzureContext, Set-AzResourceGroup and
-    Register-RequiredAzResourceProviders. External Az and filesystem operations
-    are mocked to ensure deterministic, side-effect free tests.
+    Unit tests for:
+    - Get-InfraConfig
+    - Set-AzureContext
+    - Set-AzResourceGroup
+    - Register-RequiredAzResourceProviders
+    External Az and filesystem operations are mocked so tests are deterministic and
+    side-effect free.
 .EXAMPLE
     # Run the tests from the repository root
     Invoke-Pester -Path ./bootstrap/az-bootstrap/az-bootstrap.Tests.ps1
