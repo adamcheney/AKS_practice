@@ -1,14 +1,18 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Pester unit tests for the Set-AzResourceGroup function.
+    Pester unit tests for az-bootstrap module helpers.
 .DESCRIPTION
-    Tests:
-        1) Ensure Set-AZResourceGroup creates Resource Group when missing
-        2) Ensure Set-AZResourceGroup does nothing when Resource Group already exists 
-        REWORK this whole comment block
+    Unit tests for Get-InfraConfig, Set-AzureContext, Set-AzResourceGroup and
+    Register-RequiredAzResourceProviders. External Az and filesystem operations
+    are mocked to ensure deterministic, side-effect free tests.
+.EXAMPLE
+    # Run the tests from the repository root
+    Invoke-Pester -Path ./bootstrap/az-bootstrap/az-bootstrap.Tests.ps1
 .NOTES
-    This script requires the Pester module to be installed.
+    - Requires Pester v5+ and PowerShell 7+ (PowerShell Core).
+    - The test file imports the module file az-bootstrap.psm1 from the same folder.
+    - Tests clear relevant AZURE_* environment variables to avoid leakage between runs.
 #>
 $modulePath = Join-Path $PSScriptRoot 'az-bootstrap.psm1'
 Import-Module $modulePath -Force
