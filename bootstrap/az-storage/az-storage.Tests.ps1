@@ -42,7 +42,7 @@ InModuleScope az-storage {
                 $name1 = New-UniqueStorageAccountName -Prefix 'test'
                 Mock Get-Date { "12311159590002" } -ParameterFilter { $Format -eq 'MMddHHmmssff' }
                 $name2 = New-UniqueStorageAccountName -Prefix 'test'
-                $name1 | Should -Not -Be $result2
+                $name1 | Should -Not -Be $name2
             }
         }
         Context "When passed prefix that is too long" {
