@@ -1,25 +1,38 @@
 <#
 .SYNOPSIS
-    Common parameters and reusable functions.
+    Common bootstrap helpers and shared configuration.
 .DESCRIPTION
-    The bootstrapping scripts can dot-source this file to reuse common configuration variables and functions.
-    These functions:
-    - define defaults
-    - create resource group
-    - register resource providers
+    Reusable functions for repository bootstrapping:
+      - Load infra config
+      - Ensure Azure context / login
+      - Create Resource Group (idempotent)
+      - Register required Azure resource providers
+    Designed to be dot-sourced by bootstrap scripts in this repository.
 .EXAMPLE
-    Example command showing typical usage:
-    .\MyScript.ps1 -Name1 "Value" -Name2 10
+    Set up as a module - Load-Module .\bootstrap\az-bootstrap\az-bootstrap.psm1
+    Then call functions, e.g.:
+    $cfg = Get-InfraConfig -ConfigPath "$PSScriptRoot\infra-config.json"
 .NOTES
-    Any additional information, like dependencies or version history.
+    - Intended for PowerShell Core on macOS / Linux / Windows.
+    - Keep functions small and testable; use ShouldProcess where changes occur.
 #>
-
 function Get-InfraConfig {
     <#
     .SYNOPSIS
-        Pulls infrastructure configuration from JSON file and (optionally) environment variables.
+        Load infrastructure configuration and apply environment overrides.
     .DESCRIPTION
-        Loads JSON config, applies environment-variable overrides and emits the final config object.
+        Reads a JSON configuration file and applies optional environment-variable overrides
+        for common settings (for example AZURE_RG_NAME, AZURE_LOCATION). Returns the final
+        configuration object for use by other bootstrap steps.
+    .PARAMETER ConfigPath
+        Path to the infra JSON configuration file. Defaults to '../infra-config.json' relative to this module.
+    .EXAMPLE
+        $cfg = Get-InfraConfig -ConfigPath "$PSScriptRoot\..\infra-config.json"
+    .OUTPUTS
+        PSCustomObject - the parsed and possibly modified configuration object.
+    .NOTES
+        - Throws if the file is missing or contains invalid JSON.
+        - Function is pipeline-friendly and safe to call multiple times.
     #>
     [CmdletBinding()]
     param (
@@ -53,6 +66,9 @@ function Get-InfraConfig {
         $infraConfig.resourceGroup.location = `
             Use-EnvOrDefault $env:AZURE_LOCATION `
             $infraConfig.resourceGroup.location
+        $infraConfig.storageAccount.namePrefix = `
+            Use-EnvOrDefault $env:AZURE_STORAGE_PREFIX `
+            $infraConfig.storageAccount.namePrefix
     }
 
     end {
@@ -64,9 +80,17 @@ function Get-InfraConfig {
 function Set-AzureContext {
     <#
     .SYNOPSIS
-        Ensures Azure context exists.
+        Ensure an authenticated Azure context is available.
     .DESCRIPTION
-        Checks if there is an existing Azure context; if not, it initiates a login.
+        Verifies an existing Az context is present; if not, prompts an interactive login
+        (Connect-AzAccount). This function uses SupportsShouldProcess for any action that
+        changes session state.
+    .EXAMPLE
+        $ctx = Set-AzureContext
+    .OUTPUTS
+        Microsoft.Azure.Commands.Common.Authentication.Abstractions.IAuthenticationResult (Azure context object)
+    .NOTES
+        - Intended for interactive bootstrap runs. For non-interactive automation, ensure service principal auth is configured.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param ()
@@ -81,7 +105,7 @@ function Set-AzureContext {
         if (-not ($currentContext)) {
             Write-Verbose "No Azure context found. Initiating login..." 
             try {
-                if ($PSCmdlet.ShouldProcess("AzAccount", "Remove version $loadedModule.Version")) {
+                if ($PSCmdlet.ShouldProcess("AzAccount", "Interactive Login")) {
                     $currentContext = Connect-AzAccount -ErrorAction Stop
                     Write-Verbose "Logged in to Azure successfully." 
                 }            
@@ -99,8 +123,6 @@ function Set-AzureContext {
     end { $currentContext }
 }
 
-
-# --- Reusable Functions ---
 function Set-AzResourceGroup {
     <#
     .SYNOPSIS
@@ -112,6 +134,11 @@ function Set-AzResourceGroup {
         The name of the Resource Group to create or verify.
     .PARAMETER Location
         The Azure location/region where the Resource Group should reside (e.g., 'uksouth').
+    .EXAMPLE
+        Set-AzResourceGroup -ResourceGroupName "my-rg" -Location "uksouth"
+    .NOTES
+        - Designed to be idempotent; skips creation if named Resource Group already exists.
+        - Uses New-AzResourceGroup; requires appropriate Azure permissions.
     #>
 
     [CmdletBinding(SupportsShouldProcess)]
@@ -154,11 +181,17 @@ function Set-AzResourceGroup {
 function Register-RequiredAzResourceProviders {
     <#
     .SYNOPSIS
-        Registers necessary Azure Resource Providers.
+        Register required Azure resource providers.
     .DESCRIPTION
-        Registers required Azure Resource Providers for the deployment.
+        Reads a dependencies PSD1 to obtain RequiredProviders and registers each provider
+        if it is not already registered. Throws if the dependency file is missing or malformed.
     .PARAMETER DependencyFile
-        Path to the dependencies file listing required resource providers.
+        Path to the PSD1 file containing a RequiredProviders array. Defaults to 'dependencies.psd1' next to this module.
+    .EXAMPLE
+        Register-RequiredAzResourceProviders -DependencyFile "$PSScriptRoot\dependencies.psd1"
+    .NOTES
+        - Designed to be idempotent; skips providers already registered.
+        - Uses Register-AzResourceProvider; requires appropriate Azure permissions.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param (

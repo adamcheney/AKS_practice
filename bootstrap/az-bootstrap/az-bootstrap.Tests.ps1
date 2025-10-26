@@ -15,14 +15,14 @@ Import-Module $modulePath -Force
 
 InModuleScope az-bootstrap { 
     Describe "Get-InfraConfig" -Tag 'Unit' {  
+        BeforeEach {
+            # Remove any existing EVs that may interfere with the test
+            Remove-Item -ErrorAction SilentlyContinue `
+                Env:\AZURE_RG_NAME, `
+                Env:\AZURE_LOCATION, `
+                Env:\AZURE_STORAGE_PREFIX
+        }
         Context "When no EVs defined" {
-            BeforeEach {
-                # Remove any existing EVs that may interfere with the test
-                Remove-Item -ErrorAction SilentlyContinue `
-                    Env:\AZURE_RG_NAME, `
-                    Env:\AZURE_LOCATION, `
-                    Env:\AZURE_STORAGE_NAME
-            }
             It "Should return default config values" {
                 $result = Get-InfraConfig
                 $result | Should -Not -BeNullOrEmpty
@@ -52,8 +52,8 @@ InModuleScope az-bootstrap {
                 Mock Test-Path { $false }
             }
             It "Should throw an error" {
-                { Get-InfraConfig -ConfigPath duff.json } `
-                  | Should -Throw "Config file not found at 'duff.json'."
+                { Get-InfraConfig -ConfigPath 'duff.json' } |
+                    Should -Throw -ExpectedMessage "Config file not found at 'duff.json'.*"
             }
         }
         Context "When file is not valid JSON" {
@@ -62,13 +62,12 @@ InModuleScope az-bootstrap {
                 Mock Get-Content { "{ invalid json without closing brace" }
             }
             It "Should throw an error" {
-                { Get-InfraConfig -ConfigPath guff.json } `
-                  | Should -Throw "Invalid JSON in config file 'guff.json'."
+                { Get-InfraConfig -ConfigPath 'guff.json' } |
+                    Should -Throw -ExpectedMessage "Invalid JSON in config file 'guff.json'.*"
             }
         }
     }
     Describe "Set-AzureContext" -Tag 'Unit' {
-
         It "Should be a defined function" {
             $cmd = Get-Command -Name Set-AzureContext -ErrorAction Stop
             $cmd | Should -Not -BeNullOrEmpty
