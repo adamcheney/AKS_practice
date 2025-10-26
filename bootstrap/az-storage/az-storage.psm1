@@ -1,22 +1,35 @@
 <#
 .SYNOPSIS
-    Azure Storage reusable functions.
+    Azure Storage helper functions (module).
 .DESCRIPTION
-    Idempotent creation of Azure Stoage account
+    Idempotent helpers to generate unique storage account names and ensure a backend storage account exists.
+    Intended to be used as a module (Import-Module) by bootstrap scripts and tooling.
+    Dot-sourcing is supported for quick interactive debugging but module import is preferred.
 .EXAMPLE
-    Example command showing typical usage:
-    .\MyScript.ps1 -Name1 "Value" -Name2 10
+    # Import the module for production or automated usage
+    Import-Module "$PSScriptRoot/az-storage.psm1" -Force
+    $saName = New-UniqueStorageAccountName -Prefix 'testacct'
 .NOTES
-    Any additional information, like dependencies or version history.
+    - Designed for PowerShell Core (cross-platform).
+    - Functions use ShouldProcess for operations that change state.
 #>
-
 function New-UniqueStorageAccountName {
     <#
     .SYNOPSIS
-        Generates unique name.
+        Generate a unique storage account name.
     .DESCRIPTION
-        Given a prefix, generates a suitable, unique name baseed on the date-time (to the centi-second).
-        Throws errors if the prefix contains unsuitable charaters or is too long.
+        Given a lowercase alphabetic prefix (3-12 characters), generates a unique name
+        by appending a timestamp (to centisecond precision). Validates prefix length
+        and pattern and throws on invalid input.
+    .PARAMETER Prefix
+        Lowercase alphabetic prefix (3..12 characters).
+    .EXAMPLE
+        New-UniqueStorageAccountName -Prefix 'testacct'
+    .OUTPUTS
+        System.String
+    .NOTES
+        This implements basic prefix validation. Callers should ensure the final name
+        complies with all Azure Storage naming constraints.
     #>
     [CmdletBinding()]
     param (
@@ -42,12 +55,29 @@ function New-UniqueStorageAccountName {
 function Set-BackendStorageAccount {
     <#
     .SYNOPSIS
-        Ensures Azure Storage Account exists.
+        Ensure a backend Azure Storage Account exists.
     .DESCRIPTION
-        Checks for existence of a Storage Account in the specified Resource Group, having the same prefix.
-        If not found, creates a new Storage Account with a unique name.
+        Searches the specified resource group for storage accounts with the given prefix.
+        If none exists (or creation is required), creates a new storage account with a
+        unique name. Creation is guarded by SupportsShouldProcess.
+    .PARAMETER ResourceGroupName
+        The name of the Azure resource group to inspect.
+    .PARAMETER StorageAccountNamePrefix
+        Prefix to match existing storage accounts and to use when generating a new name.
+    .PARAMETER Location
+        Azure region in which to create a new storage account if required.
+    .PARAMETER SkuName
+        Storage account SKU (default 'Standard_LRS').
+    .EXAMPLE
+        $p = @{ ResourceGroupName='test-rg'; StorageAccountNamePrefix='testacct'; Location='eastus' }
+        Set-BackendStorageAccount @p
+    .OUTPUTS
+        PSCustomObject representing the selected or newly created storage account.
+    .NOTES
+        - Function is idempotent: it prefers the most recent matching existing account.
+        - Uses Get-AzStorageAccount and New-AzStorageAccount; callers/tests may mock these.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Mandatory=$true)]
         [String]$ResourceGroupName,
@@ -55,8 +85,8 @@ function Set-BackendStorageAccount {
         [String]$StorageAccountNamePrefix,
         [Parameter(Mandatory=$true)]
         [String]$Location,
-        [String]$Sku = 'Standard_LRS',
-        [String]$Kind = 'StorageV2'
+        [Parameter(Mandatory=$false)]
+        [String]$SkuName = 'Standard_LRS'
     )
 
     begin {
@@ -67,8 +97,8 @@ function Set-BackendStorageAccount {
         $storageAccts = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName
         $mostRecent = $null
         $storageAccts | ForEach-Object {
-            $Name = $_.StorageAccountName
-            if ($Name -like "$StorageAccountNamePrefix*") {
+            $name = $_.StorageAccountName
+            if ($name -like "$StorageAccountNamePrefix*") {
                 if (-not $mostRecent -or $_.CreationTime -gt $mostRecent.CreationTime) {
                     $mostRecent = $_
                 }
@@ -76,16 +106,20 @@ function Set-BackendStorageAccount {
         }
         if (-not $mostRecent) {
             Write-Verbose "No existing Storage Account found with prefix '$StorageAccountNamePrefix'."
-            Write-Host "No existing Storage Account found with prefix '$StorageAccountNamePrefix'."
-            Write-Verbose "Creating new one."
-            Write-Host "Creating new one."
             $StorageAccountName = New-UniqueStorageAccountName -Prefix $StorageAccountNamePrefix
-            $storageAccount = New-AzStorageAccount -ResourceGroupName $ResourceGroupName `
-                -Name $StorageAccountName -Location $Location -SkuName $Sku -Kind $Kind
+            $storageAccountParams = @{
+                ResourceGroupName = $ResourceGroupName
+                Name              = $StorageAccountName
+                Location          = $Location
+                SkuName           = $SkuName
+            }
+            if ($PSCmdlet.ShouldProcess("Storage Account '$StorageAccountName' in Resource Group '$ResourceGroupName'")) {
+                Write-Verbose "Creating Storage Account: $StorageAccountName"
+                $storageAccount = New-AzStorageAccount @storageAccountParams
+            }
         }
         else {
             Write-Verbose "Found existing Storage Account: $($mostRecent.StorageAccountName). Using this."
-            Write-Host "Found existing Storage Account: $($mostRecent.StorageAccountName). Using this."
             $storageAccount = $mostRecent
         }
     }
