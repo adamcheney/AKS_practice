@@ -36,7 +36,7 @@ function Get-InfraConfig {
     #>
     [CmdletBinding()]
     param (
-        [string]$ConfigPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'infra-config.json')
+        [String]$ConfigPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'infra-config.json')
     )
 
     begin {
@@ -52,8 +52,8 @@ function Get-InfraConfig {
             throw "Invalid JSON in config file '$ConfigPath'. Error: $($_.Exception.Message)"
         }
         # Helper function to choose env var or default
-        function Use-EnvOrDefault([string]$envVar, $default) {
-            $val = ($envVar ?? '') -as [string]
+        function Use-EnvOrDefault([String]$envVar, $default) {
+            $val = ($envVar ?? '') -as [String]
             if ($val.Trim()) { return $envVar } else { return $default }
         }
     }

@@ -100,18 +100,18 @@ InModuleScope az-bootstrap {
                 $result = Set-AzureContext
             }
             It "Should run Connect-AzAccount" {
-                Assert-MockCalled Connect-AzAccount -Times 1
+                Should -Invoke Connect-AzAccount -Times 1
             }
             It "Should write verbose messages" {
-                Assert-MockCalled Write-Verbose -ParameterFilter {
+                Should -Invoke Write-Verbose -ParameterFilter {
                     $Message -match "No Azure context found. Initiating login..."
                 } -Times 1
-                Assert-MockCalled Write-Verbose -ParameterFilter {
+                Should -Invoke Write-Verbose -ParameterFilter {
                     $Message -match "Logged in to Azure successfully."
                 } -Times 1
             }
             It "Should NOT write error messages" {
-                Assert-MockCalled Write-Error -Times 0
+                Should -Invoke Write-Error -Times 0
             }
             It "Should return the correct context object" {
                 $result.Account | Should -Be "testAccount"
@@ -136,15 +136,15 @@ InModuleScope az-bootstrap {
                 $result = Set-AzureContext
             }
             It "Should NOT run Connect-AzAccount" {
-                Assert-MockCalled Connect-AzAccount -Times 0
+                Should -Invoke Connect-AzAccount -Times 0
             }
             It "Should write verbose message about existing context" {
-                Assert-MockCalled Write-Verbose -ParameterFilter {
+                Should -Invoke Write-Verbose -ParameterFilter {
                     $Message -match "Azure context exists - already logged in."
                 } -Times 1
             }
             It "Should NOT write error messages" {
-                Assert-MockCalled Write-Error -Times 0
+                Should -Invoke Write-Error -Times 0
             }
             It "Should return the existing context object" {
                 $result.Account | Should -Be "oldTestAccount"
@@ -162,7 +162,7 @@ InModuleScope az-bootstrap {
             }
             It "Should throw an error" {
                 { Set-AzureContext } | Should -Throw "Simulated login failure."
-                Assert-MockCalled Write-Error -ParameterFilter {
+                Should -Invoke Write-Error -ParameterFilter {
                     $Message -match "Azure login failed. Error: Simulated login failure."
                 } -Times 1
             }
@@ -189,7 +189,7 @@ InModuleScope az-bootstrap {
         Context "When Resource Group does not exist" {
             It "Should create the Resource Group" {
                 Set-AzResourceGroup -ResourceGroupName 'testRG' -Location 'testLocation'
-                Assert-MockCalled New-AzResourceGroup -ParameterFilter {
+                Should -Invoke New-AzResourceGroup -ParameterFilter {
                     $Name -eq 'testRG' -and $Location -eq 'testLocation'
                 } -Times 1
             }
@@ -214,7 +214,7 @@ InModuleScope az-bootstrap {
                 $result | Should -Not -BeNullOrEmpty
                 $result.ResourceGroupName | Should -Be 'testRG'
                 $result.Location | Should -Be 'testLocation'
-                Assert-MockCalled New-AzResourceGroup -Times 0
+                Should -Invoke New-AzResourceGroup -Times 0
             }
         }
         Context "When Get-AzureResourceGroup fails" {
@@ -240,7 +240,7 @@ InModuleScope az-bootstrap {
         Context "When called with -WhatIf" {
             It "Should not create a new Resource Group" {
                 Set-AzResourceGroup -ResourceGroupName 'testRG' -Location 'testLocation' -WhatIf
-                Assert-MockCalled New-AzResourceGroup -Times 0
+                Should -Invoke New-AzResourceGroup -Times 0
             }
             It "Should return $null" {
                 $result = Set-AzResourceGroup -ResourceGroupName 'testRG' -Location 'testLocation' -WhatIf
@@ -296,12 +296,12 @@ InModuleScope az-bootstrap {
                 Register-RequiredAzResourceProviders -DependencyFile './alldeps.psd1'
             }
             It "Should register each required provider" {
-                Assert-MockCalled Register-AzResourceProvider -ParameterFilter {
+                Should -Invoke Register-AzResourceProvider -ParameterFilter {
                     $ProviderNamespace -like 'Microsoft.TestProvider*'
                 } -Times 3            
             }
             It "Should write verbose messages" {
-                Assert-MockCalled Write-Verbose -ParameterFilter {
+                Should -Invoke Write-Verbose -ParameterFilter {
                     $Message -like "Registering Resource Provider: 'Microsoft.TestProvider*'..."
                 } -Times 3 -Exactly
             }
@@ -406,17 +406,17 @@ InModuleScope az-bootstrap {
                 Register-RequiredAzResourceProviders -DependencyFile './somedeps.psd1'
             }
             It "Should not call Register-AzResourceProvider for already registered providers" {
-                Assert-MockCalled Register-AzResourceProvider -ParameterFilter {
+                Should -Invoke Register-AzResourceProvider -ParameterFilter {
                     $ProviderNamespace -like 'Microsoft.TestProvider*'
                 } -Times 2 -Exactly
             }
             It "Should write verbose messages about registering" {
-                Assert-MockCalled Write-Verbose -ParameterFilter {
+                Should -Invoke Write-Verbose -ParameterFilter {
                     $Message -like "Registering Resource Provider: 'Microsoft.TestProvider*'..."
                 } -Times 2 -Exactly
             }
             It "Should write verbose message about not registering" {
-                Assert-MockCalled Write-Verbose -ParameterFilter {
+                Should -Invoke Write-Verbose -ParameterFilter {
                     $Message -like "Resource Provider 'Microsoft.TestProvider1' is already registered."
                 } -Times 1 -Exactly
             }

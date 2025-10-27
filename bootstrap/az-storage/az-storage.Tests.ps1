@@ -112,12 +112,12 @@ InModuleScope az-storage {
             }
             It "Should call New-UniqueStorageAccountName" {
                 Set-BackendStorageAccount @params
-                Assert-MockCalled New-UniqueStorageAccountName -Times 1 `
+                Should -Invoke New-UniqueStorageAccountName -Times 1 `
                     -ParameterFilter { $Prefix -eq 'testacct' }
             }
             It "Should call New-AzStorageAccount" {
                 Set-BackendStorageAccount @params
-                Assert-MockCalled New-AzStorageAccount -Times 1 `
+                Should -Invoke New-AzStorageAccount -Times 1 `
                     -ParameterFilter { `
                         $ResourceGroupName -eq 'test-rg' -and `
                         $Name -eq 'testacct123456789012' -and `
@@ -146,12 +146,12 @@ InModuleScope az-storage {
             }
             It "Should call New-UniqueStorageAccountName" {
                 Set-BackendStorageAccount @params
-                Assert-MockCalled New-UniqueStorageAccountName -Times 1 `
+                Should -Invoke New-UniqueStorageAccountName -Times 1 `
                     -ParameterFilter { $Prefix -eq 'testacct' }
             }
             It "Should call New-AzStorageAccount" {
                 Set-BackendStorageAccount @params
-                Assert-MockCalled New-AzStorageAccount -Times 1 `
+                Should -Invoke New-AzStorageAccount -Times 1 `
                     -ParameterFilter { `
                         $ResourceGroupName -eq 'test-rg' -and `
                         $Name -eq 'testacct123456789012' -and `
@@ -180,12 +180,12 @@ InModuleScope az-storage {
             }
             It "Should NOT call New-UniqueStorageAccountName" {
                 Set-BackendStorageAccount @params
-                Assert-MockCalled New-UniqueStorageAccountName -Times 0 `
+                Should -Invoke New-UniqueStorageAccountName -Times 0 `
                     -ParameterFilter { $Prefix -eq 'testacct' }
             }
             It "Should NOT call New-AzStorageAccount" {
                 Set-BackendStorageAccount @params
-                Assert-MockCalled New-AzStorageAccount -Times 0 `
+                Should -Invoke New-AzStorageAccount -Times 0 `
                     -ParameterFilter { `
                         $ResourceGroupName -eq 'test-rg' -and `
                         $Location -eq 'eastus' }
@@ -212,12 +212,12 @@ InModuleScope az-storage {
             }
             It "Should NOT call New-UniqueStorageAccountName" {
                 Set-BackendStorageAccount @params
-                Assert-MockCalled New-UniqueStorageAccountName -Times 0 `
+                Should -Invoke New-UniqueStorageAccountName -Times 0 `
                     -ParameterFilter { $Prefix -eq 'testacct' }
             }
             It "Should NOT call New-AzStorageAccount" {
                 Set-BackendStorageAccount @params
-                Assert-MockCalled New-AzStorageAccount -Times 0 `
+                Should -Invoke New-AzStorageAccount -Times 0 `
                     -ParameterFilter { `
                         $ResourceGroupName -eq 'test-rg' -and `
                         $Location -eq 'eastus' }
