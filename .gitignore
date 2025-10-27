@@ -10,3 +10,5 @@
 **/.terraform
 **/*.tfstate*
 **/coverage.xml
+bootstrap/temp-ignore/*
+
