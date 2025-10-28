@@ -8,8 +8,8 @@ This repo is a place to play with learning how to construct an AKS cluster with 
 | Folder| Purpose |
 |--|--|
 | `./bootstrap/` | Powershell modules for environment setup and IaC backend creation |
-| `./terraform/ | Terraform IaC Definitions|
-| `./pulumi/ | Pulumi IaC definitions |
+| `./terraform/` | Terraform IaC Definitions|
+| `./pulumi/` | Pulumi IaC definitions |
 
 ## Quick Start
 
