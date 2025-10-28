@@ -1,19 +1,16 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Initialises PowerShell environment
+    Initialize PowerShell environment for bootstrap scripts.
 .DESCRIPTION
-    The bootstrapping scripts can dot-source this file to initialise.
-    Also enforces TLS1.2 for secure connections.
-    This function:
-    - Get-InfraConfig - returns the config hash
-    These cmdlets:
-    - Set-PSResourceGetv3 - ensures PSResourceGet v3 is installed and imported
-    - Ensure-ModuleVersion - ensures a specific module and version is imported
-    - Import-BootstrapDependencies - imports required modules from a psd1 file
-    - Set-AzureContext - ensures Azure context exists (logs in if not)
+    Prepares the execution environment for the repository bootstrapping scripts.
+    - Enforces TLS 1.2.
+    - Provides helper functions to ensure and import specific module versions.
+    - Installs and imports PSResourceGet v3 when required.
+    These helpers are intended for dot-sourcing by bootstrap scripts.
 .NOTES
-    Any additional information, like dependencies or version history.
+    - Idempotent: functions avoid re-installing or re-importing when not required.
+    - Tested on macOS with PowerShell Core.
 #>
 
 # --- Enforce TLS1.2 ---
@@ -24,12 +21,18 @@
 function Set-PSResourceGetv3 {
     <#
     .SYNOPSIS
-        Imports and installs PSResourceGet v3.
+        Ensure PSResourceGet v3 is installed and imported.
     .DESCRIPTION
-        Checks to see if the specified version of PSResourceGet is installed, installs it if missing, and imports it.
-        This function is idempotent.
-    .PARAMETER Verson
-        The specific version to Install/Import - defaults to '1.1.1'.
+        Installs the specified version of Microsoft.PowerShell.PSResourceGet (v3) if missing,
+        then imports that exact version into the current session. This function is idempotent.
+    .PARAMETER Version
+        The exact version of PSResourceGet to ensure is installed and imported. Defaults to '1.1.1'.
+    .EXAMPLE
+        Set-PSResourceGetv3 -Version '1.1.1'
+    .OUTPUTS
+        The imported module object (PassThru from Import-Module) when imported.
+    .NOTES
+        Uses Install-Module to perform installation (CurrentUser scope).
     #>
 
     [CmdletBinding(SupportsShouldProcess)]
@@ -67,15 +70,21 @@ function Set-PSResourceGetv3 {
 function Ensure-ModuleVersion {
     <#
     .SYNOPSIS
-        Ensures a specific PowerShell module and version is imported - throws an error if not installed.
+        Ensure a specific module version is imported into the session.
     .DESCRIPTION
-        Checks if the specified module and version is imported; removes and reimports if a different version is loaded.
-        If the module/version is not installed, it throws an error.
-        This function is idempotent.
+        Verifies that the requested module version is installed. If a different
+        version is loaded, the loaded module is removed and the requested version
+        is imported. Throws an error when the requested version is not installed.
     .PARAMETER ModuleName
-        The name of the PowerShell module.
+        The module name to ensure.
     .PARAMETER ModuleVersion
-        The required version of the module.
+        The exact module version required (string).
+    .EXAMPLE
+        Ensure-ModuleVersion -ModuleName 'Az.Accounts' -ModuleVersion '2.0.0'
+    .OUTPUTS
+        The imported module object (PassThru) when import succeeds.
+    .NOTES
+        Intended for use by bootstrap scripts to guarantee specific module versions.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param (
@@ -130,12 +139,20 @@ function Ensure-ModuleVersion {
 function Import-BootstrapDependencies {
     <#
     .SYNOPSIS
-        Imports and installs required PowerShell modules.
+        Install and import modules declared in a dependencies psd1 file.
     .DESCRIPTION
-        Reads the dependencies from a psd1 file and ensures they are installed and imported.
-        This function is idempotent.
+        Reads the 'RequiredModules' section from a PowerShell data file (PSD1),
+        ensures each specified module/version is available (installs via Install-PSResource
+        when missing) and imports the requested version into the session.
+        This function calls Set-PSResourceGetv3 to ensure the PSResourceGet helper is available.
     .PARAMETER DependencyFile
-        The path of the dependencies psd1 file - defaults to 'dependencies.psd1' in the same directory as this script.
+        Path to the PSD1 file containing a 'RequiredModules' array with ModuleName/ModuleVersion entries.
+        Defaults to 'dependencies.psd1' in the same directory as this script.
+    .EXAMPLE
+        Import-BootstrapDependencies -DependencyFile "$PSScriptRoot\dependencies.psd1"
+    .NOTES
+        Throws when the dependency file is missing or malformed.
+        Uses Install-PSResource to install modules into the CurrentUser scope.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param (
@@ -205,14 +222,18 @@ function Import-BootstrapDependencies {
 function Initialize-Bootstrap {
     <#
     .SYNOPSIS
-        Initialises bootstrapping process
+        High-level initialization for bootstrap process.
     .DESCRIPTION
-        Downloads PSResourceGet v3.
-        Reads dependencies from psd1 file and installs and imports.
+        Convenience wrapper that ensures PSResourceGet v3 is available and then
+        installs/imports modules defined in the dependencies PSD1 file.
     .PARAMETER PSResourceGetVersion
-        The version of PSResourceGet to install - defaults to '1.1.1'.
-    .PARAMETER DependencyFile
-        The path of the dependencies psd1 file - defaults to 'dependencies.psd1' in the same directory as this script.
+        Version of PSResourceGet to install/import (default '1.1.1').
+    .PARAMETER DependenciesPath
+        Path to the dependencies PSD1 file (default: dependencies.psd1 in this script folder).
+    .EXAMPLE
+        Initialize-Bootstrap -PSResourceGetVersion '1.1.1' -DependenciesPath "$PSScriptRoot\dependencies.psd1"
+    .NOTES
+        Calls Set-PSResourceGetv3 and Import-BootstrapDependencies.
     #>
     [CmdletBinding()]
     param (

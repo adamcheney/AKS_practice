@@ -41,14 +41,14 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
     }
     Context "When not installed" {
         BeforeAll {
-            Mock Get-Module { $null }
+            Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
         }
         It "Should install and import PSResourceGet v3" {
             # Call the function
             Set-PSResourceGetv3 -Version '1.1.1'
             # Assert that the mocks were called
-            Assert-MockCalled Install-Module -Times 1
-            Assert-MockCalled Ensure-ModuleVersion -Times 1
+            Should -Invoke Install-Module -Times 1
+            Should -Invoke Ensure-ModuleVersion -Times 1
         }
         It "Should return the expected module object" {
             $result = Set-PSResourceGetv3 -Version '1.1.1'
@@ -59,18 +59,20 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
     Context "Correct version already installed" {
         BeforeAll {
             Mock Get-Module {
-                [PSCustomObject]@{
-                    Name = 'Microsoft.PowerShell.PSResourceGet'
-                    Version = [Version]'1.1.1'
-                }
+                @(
+                    [PSCustomObject]@{
+                        Name = 'Microsoft.PowerShell.PSResourceGet'
+                        Version = [Version]'1.1.1'
+                    }
+                )
             }
         }
         It "Should not install PSResourceGet v3" {
             # Call the function
             Set-PSResourceGetv3 -Version '1.1.1'
             # Assert that the mocks were called
-            Assert-MockCalled Install-Module -Times 0
-            Assert-MockCalled Ensure-ModuleVersion -Times 1
+            Should -Invoke Install-Module -Times 0
+            Should -Invoke Ensure-ModuleVersion -Times 1
         }
         It "Should return the expected module object" {
             $result = Set-PSResourceGetv3 -Version '1.1.1'
@@ -81,14 +83,15 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
 }
 
 Describe "Ensure-ModuleVersion" -Tag 'Unit' {
-    Context "When module is not installed" {}
+    Context "When module is not installed" {
         BeforeAll {
-            Mock Get-Module { $null }
+            Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
         }
         It "Should throw an error" {
-            { Ensure-ModuleVersion -ModuleName 'Null' -ModuleVersion '0.0' } `
-              | Should -Throw "Module 'Null' version '0.0' not installed."
+            { Ensure-ModuleVersion -ModuleName 'Null' -ModuleVersion '0.0' } |
+                Should -Throw "Module 'Null' version '0.0' not installed."
         }
+    }
     Context "When installed incorrect version" {
         BeforeAll {
             Mock Get-Module {
@@ -101,8 +104,8 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
             }
         }
         It "Should throw an error" {
-            { Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '5.0.0' } `
-              | Should -Throw "Module 'Test' version '5.0.0' not installed."
+            { Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '5.0.0' } |
+                Should -Throw "Module 'Test' version '5.0.0' not installed."
         }
     }
     Context "When module installed none imported" {
@@ -129,8 +132,8 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
         }
         It "Should import module and not unload" {
             Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '4.2.0'
-            Assert-MockCalled Remove-Module -Times 0
-            Assert-MockCalled Import-Module -Times 1
+            Should -Invoke Remove-Module -Times 0
+            Should -Invoke Import-Module -Times 1
         }
         It "Should return module object" {
             $result = Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '4.2.0'
@@ -167,8 +170,8 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
         }
         It "Should not unload but still import module" {
             Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '4.2.0'
-            Assert-MockCalled Remove-Module -Times 0
-            Assert-MockCalled Import-Module -Times 1
+            Should -Invoke Remove-Module -Times 0
+            Should -Invoke Import-Module -Times 1
         }
         It "Should return module object" {
             $result = Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '4.2.0'
@@ -209,8 +212,8 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
         }
         It "Should unload and import correct module version" {
             Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '4.2.0'
-            Assert-MockCalled Remove-Module -Times 1
-            Assert-MockCalled Import-Module -Times 1
+            Should -Invoke Remove-Module -Times 1
+            Should -Invoke Import-Module -Times 1
         }
         It "Should return module object" {
             $result = Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '4.2.0'
@@ -236,8 +239,9 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
             } -ParameterFilter { $ListAvailable }
             Mock Remove-Module { throw "Removal failed" }
             Mock Import-Module {
+                param($args)
                 [PSCustomObject]@{
-                    Name = 'Test';
+                    Name = 'Test'
                     Version = [Version]'4.2.0'
                 }
             }
@@ -245,7 +249,7 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
         }
         It "Should write an error if Remove-Module fails" {
             Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '4.2.0'
-            Assert-MockCalled Write-Error -ParameterFilter { 
+            Should -Invoke Write-Error -ParameterFilter { 
                 $Message -match 'Failed to remove module' 
             } -Times 1
         }
@@ -267,7 +271,7 @@ Describe "Ensure-ModuleVersion" -Tag 'Unit' {
         }
         It "Should write an error if Import-Module fails" {
             { Ensure-ModuleVersion -ModuleName 'Test' -ModuleVersion '4.2.0' } | Should -Throw "Import failed"
-            Assert-MockCalled Write-Error -ParameterFilter { $Message -match 'Failed to import module' } -Times 1
+            Should -Invoke Write-Error -ParameterFilter { $Message -match 'Failed to import module' } -Times 1
         }
     }
 
@@ -281,8 +285,8 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
             Mock Test-Path { $false }
         }
         It "Should throw an error" {
-            { Import-BootstrapDependencies -DependencyFile 'nonexistent.psd1' } `
-              | Should -Throw "Dependency file 'nonexistent.psd1' not found."
+            { Import-BootstrapDependencies -DependencyFile 'nonexistent.psd1' } |
+                Should -Throw "Dependency file 'nonexistent.psd1' not found."
         }
     }
     Context "When file present but empty" {
@@ -293,7 +297,7 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
         }
         It "Should write 'No RequiredModules found' and return early" {
             Import-BootstrapDependencies -DependencyFile 'empty.psd1'
-            Assert-MockCalled Write-Information -Times 1 -ParameterFilter {
+            Should -Invoke Write-Information -Times 1 -ParameterFilter {
                 $Message -like '*No RequiredModules found*'
             }
         }
@@ -314,7 +318,7 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
         }
         It "Should throw an error" {
             { Import-BootstrapDependencies } | Should -Throw "Package(s) 'Invalid' could not be installed from repository 'PSGallery'."
-            Assert-MockCalled Write-Error -ParameterFilter {
+            Should -Invoke Write-Error -ParameterFilter {
                 $Message -match "Failed to install module"
             } -Times 1
         }
@@ -325,8 +329,8 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
             Mock Import-PowerShellDataFile { throw "Simulated parse failure" }
         }
         It "Should throw an import error" {
-            { Import-BootstrapDependencies -DependencyFile 'malformed.psd1' } `
-              | Should -Throw "Failed to import dependency file 'malformed.psd1'. Error: Simulated parse failure"
+            { Import-BootstrapDependencies -DependencyFile 'malformed.psd1' } |
+                Should -Throw "Failed to import dependency file 'malformed.psd1'. Error: Simulated parse failure"
         }
     }
     Context "When dependency file has valid module not installed" {
@@ -339,7 +343,7 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
                     )
                 }
             }
-            Mock Get-Module { $null }
+            Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
             Mock Install-PSResource {
                 [PSCustomObject]@{
                     Name = 'Test'
@@ -355,10 +359,10 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
         }
         It "Should install each missing module" {
             Import-BootstrapDependencies -DependencyFile 'valid.psd1'
-            Assert-MockCalled Install-PSResource -ParameterFilter {
+            Should -Invoke Install-PSResource -ParameterFilter {
                 $Name -eq 'Test' -and $Version -eq '4.2.0'
             } -Times 1
-            Assert-MockCalled Ensure-ModuleVersion -ParameterFilter {
+            Should -Invoke Ensure-ModuleVersion -ParameterFilter {
                 $ModuleName -eq 'Test' -and $ModuleVersion -eq '4.2.0'
             } -Times 1
         }
@@ -389,8 +393,8 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
         }
         It "Should skip installation and call Ensure-ModuleVersion" {
             Import-BootstrapDependencies -DependencyFile 'valid.psd1'
-            Assert-MockCalled Install-PSResource -Times 0
-            Assert-MockCalled Ensure-ModuleVersion -ParameterFilter {
+            Should -Invoke Install-PSResource -Times 0
+            Should -Invoke Ensure-ModuleVersion -ParameterFilter {
                 $ModuleName -eq 'Test' -and $ModuleVersion -eq '4.2.0'
             } -Times 1
         }
@@ -405,24 +409,25 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
                         )
                     }
                 }
-                Mock Get-Module { $null } -ParameterFilter { $ListAvailable }
+                Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
                 Mock Install-PSResource { throw "Package(s) 'Fail' could not be installed from repository 'PSGallery'." }
                 Mock Write-Verbose {}
-                Mock Write-Error {}
+                Mock Write-Error {
             }
             It "Should throw an error and stop processing" {
-                { Import-BootstrapDependencies -DependencyFile 'fail.psd1' } `
-                  | Should -Throw "Package(s) 'Fail' could not be installed from repository 'PSGallery'."
-                Assert-MockCalled Write-Verbose -ParameterFilter {
+                { Import-BootstrapDependencies -DependencyFile 'fail.psd1' } |
+                    Should -Throw "Package(s) 'Fail' could not be installed from repository 'PSGallery'."
+                Should -Invoke Write-Verbose -ParameterFilter {
                     $Message -match "Installing module 'Fail' version '1.0.0'..."
                 } -Times 1
-                Assert-MockCalled Write-Verbose -ParameterFilter {
+                Should -Invoke Write-Verbose -ParameterFilter {
                     $Message -match "Module 'Fail' installed successfully."
                 } -Times 0
-                Assert-MockCalled Write-Error -ParameterFilter {
+                Should -Invoke Write-Error -ParameterFilter {
                     $Message -match "Failed to install module 'Fail'.*"
                 } -Times 1
             }
+        }
     }
 }
 Describe "Initialize-Bootstrap" -Tag 'Unit' {
@@ -435,8 +440,8 @@ Describe "Initialize-Bootstrap" -Tag 'Unit' {
   }
   It "Should call Set-PSResourceGetv3 and Import-BootstrapDependencies" {
     Initialize-Bootstrap
-    Assert-MockCalled Set-PSResourceGetv3 -ParameterFilter { $Version -eq '1.1.1' } -Times 1
-    Assert-MockCalled Import-BootstrapDependencies -ParameterFilter { $DependencyFile -eq './deps.psd1' } -Times 1
+    Should -Invoke Set-PSResourceGetv3 -ParameterFilter { $Version -eq '1.1.1' } -Times 1
+    Should -Invoke Import-BootstrapDependencies -ParameterFilter { $DependencyFile -eq './deps.psd1' } -Times 1
   }
 }
 
