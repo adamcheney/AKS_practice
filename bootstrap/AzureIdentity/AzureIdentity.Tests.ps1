@@ -1,23 +1,23 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Pester unit tests for az-identity module helpers.
+    Pester unit tests for AzureIdentity module helpers.
 .DESCRIPTION
     Unit tests for 
     . External Az and filesystem operations
     are mocked to ensure deterministic, side-effect free tests.
 .EXAMPLE
     # Run the tests from the repository root
-    Invoke-Pester -Path ./bootstrap/az-identity/az-identity.Tests.ps1
+    Invoke-Pester -Path ./bootstrap/AzureIdentity/AzureIdentity.Tests.ps1
 .NOTES
     - Requires Pester v5+ and PowerShell 7+ (PowerShell Core).
     - The test file imports the module file identity.psm1 from the same folder.
     - Tests clear relevant AZURE_* environment variables to avoid leakage between runs.
 #>
-$modulePath = Join-Path $PSScriptRoot 'az-identity.psm1'
+$modulePath = Join-Path $PSScriptRoot 'AzureIdentity.psm1'
 Import-Module $modulePath -Force
 
-InModuleScope az-identity {
+InModuleScope AzureIdentity {
     Describe "Set-AzIdentityKeyVault" {
         BeforeAll {
             Mock Get-AzResourceGroup {

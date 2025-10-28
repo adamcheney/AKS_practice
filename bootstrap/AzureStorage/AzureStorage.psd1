@@ -1,15 +1,14 @@
 @{
-    RootModule = 'az-bootstrap.psm1'
+    RootModule = 'AzureStorage.psm1'
+    GUID = 'd349caa0-45c8-4a8c-9fd2-f05b6a05655d'
     ModuleVersion = '0.1.0'
     Author = 'Adam Cheney'
-    Description = 'Bootstrap helpers for Azure used by repository bootstrap scripts.'
+    Description = 'Azure Storage helpers for backend storage account provisioning in bootstrap scripts.'
     PowerShellVersion = '7.0'
     CompatiblePSEditions = @('Core')
     FunctionsToExport = @(
-        'Get-InfraConfig'
-        'Set-AzureContext'
-        'Set-AzResourceGroup'
-        'Register-RequiredAzResourceProviders'
+        'New-UniqueStorageAccountName'
+        'Set-BackendStorageAccount'
     )
     CmdletsToExport = @()
     VariablesToExport = @()
@@ -17,7 +16,7 @@
     PrivateData = @{
         PSData = @{
             Tags = @('Azure','Bootstrap','Infrastructure')
-            ProjectUri = ''
+            ProjectUri = 'https://github.com/adamcheney/AKS_practice/'
             LicenseUri = ''
             ReleaseNotes = 'Initial manifest'
         }

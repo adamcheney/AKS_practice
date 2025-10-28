@@ -5,5 +5,5 @@ list: ## List all available make targets
 
 boottf: ## Bootstrap Azure environment and Terraform backend
 	@echo "Bootstrapping Azure environment and Terraform backend..."
-	@pwsh ./bootstrap-terraform.ps1
+	@pwsh ./initialiseß.ps1
 	@echo "Bootstrap completed."

@@ -15,7 +15,7 @@
     - grant service principal access to container
 .EXAMPLE
     # Import the module for production or automated usage
-    Import-Module "$PSScriptRoot/az-identity.psm1" -Force
+    Import-Module "$PSScriptRoot/AzureIdentity.psm1" -Force
     $token = Get-AzAccessToken -Resource 'https://management.azure.com/'
     
 .NOTES

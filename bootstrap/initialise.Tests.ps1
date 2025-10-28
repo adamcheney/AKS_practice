@@ -445,3 +445,18 @@ Describe "Initialize-Bootstrap" -Tag 'Unit' {
   }
 }
 
+Describe "Import-IaCAzureBackendModules" -Tag 'Unit' {
+    BeforeAll {
+        Mock Import-Module {}
+    }
+    Context "When modules are not specified" {
+        It "Should import default modules" {
+            Import-IaCAzureBackendModules
+            Should -Invoke Import-Module -ParameterFilter { $Name -eq '}
+}
+Describe "Initialize-IaCAzureBackend" -Tag 'Unit' {
+    BeforeAll {
+        Mock Load-Module {}
+    }
+}
+
