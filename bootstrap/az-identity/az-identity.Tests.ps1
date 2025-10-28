@@ -48,7 +48,7 @@ InModuleScope az-identity {
                 $params = $baseParams.Clone()
                 $params.ResourceGroupName = 'non-existent-rg'
             }
-            It "Throws an error" {
+            It "Should throw an error" {
                 { Set-AzIdentityKeyVault @params } | Should -Throw "Resource Group 'non-existent-rg' does not exist."
             }
         }
@@ -57,7 +57,7 @@ InModuleScope az-identity {
                 Mock Get-AzKeyVault { $null }
                 $params = $baseParams.Clone()
             }
-            It "Creates a new Key Vault" {
+            It "Should create a new Key Vault" {
                 $result = Set-AzIdentityKeyVault @params
                 Should -Invoke New-AzKeyVault -Times 1 -ParameterFilter {
                     $Name -eq 'testvault' -and
@@ -71,18 +71,25 @@ InModuleScope az-identity {
                 $result | Should -Not -Be $null
                 $result.VaultName | Should -Be 'testvault'
             }
-            It "Should Respect ShouldProcess" {
+            It "Should respect ShouldProcess" {
                 { Set-AzIdentityKeyVault @params -WhatIf }
                 Should -Invoke New-AzKeyVault -Times 0
             }
-            It "Should Returns $null when skipped by ShouldProcess" {
+            It "Should return $null when skipped by ShouldProcess" {
                 $result = Set-AzIdentityKeyVault @params -WhatIf
                 $result | Should -Be $null
             }
         }
     }
-    Describe "New-ServicePrincipalIdCertificate" {
-        BeforeAll {}
+    Describe "New-ServicePrincipalIdCredentials" {
+        BeforeAll {
+            $credsParams = @{
+                CommonName     = 'MySP'
+                KeyLength      = 2048
+                Expiry         = (Get-Date).AddYears(1)
+                TempIdFilePath = '/foo/bar'
+            }
+        }
         Context "When OpenSSL is not installed at all"  {
             BeforeAll {
                 Mock Get-OpenSSLInfo {
@@ -94,8 +101,8 @@ InModuleScope az-identity {
                     }
                 }
             }
-            It "Throws an error" {
-                { New-ServicePrincipalIdCertificate -CommonName 'MySP' } | 
+            It "Should throw an error" {
+                { New-ServicePrincipalIdCredentials @credsParams } | 
                     Should -Throw "OpenSSL not found in PATH. Install OpenSSL or add it to PATH."
             }
         }
@@ -120,8 +127,8 @@ InModuleScope az-identity {
                                     '/opt/homebrew/bin/openssl', `
                                     'openssl' }
             }
-            It "Throws an error about LibreSSL" {
-                { New-ServicePrincipalIdCertificate -CommonName 'MySP' } | 
+            It "Should throw an error about LibreSSL" {
+                { New-ServicePrincipalIdCredentials @credsParams } | 
                     Should -Throw "OpenSSL >= 3.0.0 required. Found LibreSSL 3.3.6."
             }
         }
@@ -146,8 +153,8 @@ InModuleScope az-identity {
                                     '/opt/homebrew/bin/openssl', `
                                     'openssl' }
             }
-            It "Throws an error about version" {
-                { New-ServicePrincipalIdCertificate -CommonName 'MySP' } | 
+            It "Should throw an error about version" {
+                { New-ServicePrincipalIdCredentials @credsParams } | 
                     Should -Throw "OpenSSL >= 3.0.0 required. Found OpenSSL 2.8.3."
             }
         }
@@ -168,10 +175,15 @@ InModuleScope az-identity {
                     param($OpenSSLPath, $PrivateKeyPath, $OutputPath, $CommonName)
                     return '/foo/bar/temp-cert.crt'
                 }
-
+                Mock Export-IdentityCertificateFiles {
+                    @{
+                        DerPath = '/foo/bar/temp-cert.cer'
+                        PfxPath = '/foo/bar/temp-cert.pfx'
+                    }
+                }
             }
-            It "Runs the New-PrivateKey helper with correct parameters" {
-                New-ServicePrincipalIdCertificate -CommonName 'MySP'
+            It "Should run the New-PrivateKey helper with correct parameters" {
+                New-ServicePrincipalIdCredentials @credsParams
                 Should -Invoke New-PrivateKey -Times 1 -ParameterFilter {
                     $OpenSSLPath -eq '/opt/homebrew/bin/openssl' -and
                     $OutputPath -like '*temp-private.pem'
@@ -180,16 +192,67 @@ InModuleScope az-identity {
         }
         Context "When generating a self-signed certificate" {
             BeforeAll {
+                Mock New-PrivateKey {
+                    param($OpenSSLPath, $OutputPath)
+                    return '/foo/bar/temp-private.pem'
+                }
+                Mock Get-OpenSSLInfo { 
+                    @{
+                        Found   = $true
+                        Path    = '/opt/homebrew/bin/openssl'
+                        Version = 'OpenSSL 3.3.1' 
+                    }
+                }
                 Mock New-SelfSignedIdentityCertificate {
-                    param($OpenSSLPath, $PrivateKeyPath, $OutputPath, $CommonName, $ValidityDays)
-                    return 'temp-cert.crt'
+                    param($OpenSSLPath, $PrivateKeyPath, $OutputPath, $CommonName)
+                    return '/foo/bar/temp-cert.crt'
+                }
+                Mock Export-IdentityCertificateFiles {
+                    @{
+                        DerPath = '/foo/bar/temp-cert.cer'
+                        PfxPath = '/foo/bar/temp-cert.pfx'
+                    }
                 }
             }
-            It "Calls OpenSSL with correct parameters" {
+            It "Should run the New-SelfSignedIdentityCertificate helper with correct parameters" {
+                New-ServicePrincipalIdCredentials @credsParams
+                Should -Invoke New-SelfSignedIdentityCertificate -Times 1 -ParameterFilter {
+                    $OpenSSLPath     -eq '/opt/homebrew/bin/openssl' -and
+                    $PrivateKeyPath  -eq '/foo/bar/temp-private.pem' -and
+                    $OutputPath      -eq '/foo/bar/temp-cert.crt' -and
+                    $CommonName      -eq 'MySP'
+                }
             }
-            It "Throws a meaningful error if OpenSSL fails" {
+        }
+        Context "When exporting certificate files" {
+            BeforeEach {
+                Mock Get-OpenSSLInfo { 
+                    @{ 
+                        Found=$true
+                        Path='openssl'
+                        Version='OpenSSL 3.3.1'
+                    }
+                }
+                Mock New-PrivateKey { '/foo/bar/temp-private.pem' }
+                Mock New-SelfSignedIdentityCertificate { '/foo/bar/temp-cert.crt' }
+                Mock Export-IdentityCertificateFiles {
+                    @{
+                        DerPath = '/foo/bar/temp-cert.cer'
+                        PfxPath = '/foo/bar/temp-cert.pfx'
+                    }
+                }
             }
-            It "Returns the generated certificate path on success" {
+            It "Should call Export-IdentityCertificateFiles with correct parameters" {
+                New-ServicePrincipalIdCredentials @credsParams
+                Should -Invoke Export-IdentityCertificateFiles -Times 1 -ParameterFilter {
+                    $CertPath -eq '/foo/bar/temp-cert.crt' -and
+                    $KeyPath -eq '/foo/bar/temp-private.pem'
+                }
+            }
+            It "Should return expected certificate file paths" {
+                $result = New-ServicePrincipalIdCredentials @credsParams
+                $result.DerPath | Should -Be '/foo/bar/temp-cert.cer'
+                $result.PfxPath | Should -Be '/foo/bar/temp-cert.pfx'
             }
         }
     }
@@ -199,7 +262,7 @@ InModuleScope az-identity {
             Mock Invoke-Expression { "OpenSSL 3.3.1" }
         }
         Context "When OpenSSL is found" {
-            It "Returns found=true and version text" {
+            It "Should return found=true and version text" {
                 $r = Get-OpenSSLInfo -Path 'openssl'
                 $r.Found | Should -BeTrue
                 $r.Version | Should -Match '3\.3\.1'
@@ -209,7 +272,7 @@ InModuleScope az-identity {
             BeforeEach {
                 Mock Get-Command { throw "not found" }
             }
-            It "Returns found=false" {
+            It "Should return found=false" {
                 Mock Get-Command { throw "not found" }
                 $r = Get-OpenSSLInfo -Path 'missing'
                 $r.Found | Should -BeFalse
@@ -235,13 +298,13 @@ InModuleScope az-identity {
                 $global:LASTEXITCODE = 0
                 
             }
-            It "returns the resolved output path" {
+            It "Should return the resolved output path" {
                 $result = New-PrivateKey @params
                 $result | Should -Match 'private\.pem'
             }
-            It "calls Invoke-Expression with expected arguments" {
+            It "Should call Invoke-Expression with expected arguments" {
                 New-PrivateKey @params
-                Assert-MockCalled Invoke-Expression -Times 1 -Exactly -Scope It
+                Should -Invoke Invoke-Expression -Times 1 -Exactly -Scope It
             }
         }
         Context "When OpenSSL fails" {
@@ -249,7 +312,7 @@ InModuleScope az-identity {
                 Mock Invoke-Expression { "error" }
                 $global:LASTEXITCODE = 1
             }
-            It "throws an error including OpenSSL output" {
+            It "Should throw an error including OpenSSL output" {
                 { New-PrivateKey @params } |
                 Should -Throw "Failed to generate private key: error"
             }
@@ -268,7 +331,7 @@ InModuleScope az-identity {
                     }
                 }
             }
-            It "Returns resolved output path on success" {
+            It "Should return resolved output path on success" {
                 $result = New-SelfSignedIdentityCertificate -OpenSSLPath 'openssl' -PrivateKeyPath './key.pem' -OutputPath './cert.pem' -CommonName 'test'
                 $result | Should -Match 'cert\.pem'
             }
@@ -284,9 +347,115 @@ InModuleScope az-identity {
                     CommonName      = 'test'
                 }
             }
-            It "Throws an error" {
+            It "Should throw an error" {
                 { New-SelfSignedIdentityCertificate @params } |
                     Should -Throw
+            }
+        }
+    }
+    Describe "Export-IdentityCertificateFiles" {
+        BeforeAll {
+            $exportParams = @{
+                OpenSSLPath = 'openssl'
+                CertPath    = '/foo/bar/cert.crt'
+                KeyPath     = '/foo/bar/key.pem'
+            }
+        }
+        Context "When OpenSSL exports successfully" {
+            BeforeAll {
+                Mock Invoke-Expression { "OK" }
+                Mock Test-Path { $true }
+                Mock Resolve-Path {
+                    param($Path)
+                    [pscustomobject]@{
+                        Path = $Path
+                    }
+                }
+                $global:LASTEXITCODE = 0
+            }
+            It "Should return expected file paths" {
+                $result = Export-IdentityCertificateFiles @exportParams
+                $result.DerPath | Should -Be '/foo/bar/certificate.der'
+                $result.PfxPath | Should -Be '/foo/bar/certificate.pfx'
+            }
+            It "Should call OpenSSL twice (once for each export)" {
+                Export-IdentityCertificateFiles @exportParams
+                Should -Invoke Invoke-Expression -Times 2
+            }
+        }
+        Context "When OpenSSL fails" {
+            BeforeEach {
+                Mock Invoke-Expression { "error" }
+                $global:LASTEXITCODE = 1
+            }
+            It "Should throw with the OpenSSL output" {
+                { Export-IdentityCertificateFiles @exportParams } |
+                Should -Throw "Failed to export certificate files: error"
+            }
+        }
+    }
+    Describe "New-AutomationServicePrincipal" {
+        BeforeAll {
+            Mock New-ServicePrincipalIdCredentials {
+                @{
+                    DerPath = '/foo/bar/cert.cer'
+                    PfxPath = '/foo/bar/cert.pfx'
+                }
+            }
+            Mock New-AzADAppCredential { $null }
+            $identityParams = @{
+                DisplayName  = 'test-app'
+                KeyLength    = 2048
+                CertExpiry   = (Get-Date).AddYears(1)
+                TempFilePath = '/foo/bar'
+            }
+        }
+        It "Should be a defined function" {
+            $cmd = Get-Command -Name New-AutomationServicePrincipal -ErrorAction Stop
+            $cmd | Should -Not -BeNullOrEmpty
+            $cmd.CommandType | Should -Be 'Function'
+            # Ensure it exposes a parameter block (not strictly behavioural, but useful)
+            $cmd.Parameters.Keys | Should -Not -BeNullOrEmpty
+        }
+        Context "When AD Application already exists" {
+            BeforeAll {
+                Mock Get-AzADApplication {
+                    [pscustomobject]@{
+                        AppId       = '00000000-0000-0000-0000-000000000001'
+                        DisplayName = 'test-app'
+                        Id          = 'app-object-id'
+                    }
+                }
+                Mock New-AzADApplication { $null }
+            }
+            It "Should not attempt to create a new application" {
+                New-AutomationServicePrincipal @identityParams
+                Should -Invoke New-AzADApplication -Times 0
+            }
+        }
+        Context "When AD Application does not exist" {
+            BeforeAll {
+                Mock Get-AzADApplication { $null }
+                Mock New-AzADApplication {
+                    param($DisplayName)
+                    [pscustomobject]@{
+                        AppId       = '00000000-0000-0000-0000-000000000001'
+                        DisplayName = $DisplayName
+                        Id          = 'new-app-object-id'
+                    }
+                }
+            }
+            It "Should create a new set of credentials" {
+                New-AutomationServicePrincipal @identityParams
+                Should -Invoke New-ServicePrincipalIdCredentials -Times 1 -ParameterFilter {
+                    $CommonName -eq 'test-app' }
+                
+            }
+            It "Should create a new application" {
+                New-AutomationServicePrincipal @identityParams
+                Should -Invoke New-AzADApplication -Times 1 -ParameterFilter {
+                    $DisplayName -eq 'test-app'
+                }
             }
         }
     }

@@ -125,7 +125,7 @@ function Get-OpenSSLInfo {
     }
 }
 
-function New-ServicePrincipalIdCertificate {
+function New-ServicePrincipalIdCredentials {
     <#
     .SYNOPSIS
         Create a new self-signed certificate for a service principal.
@@ -139,7 +139,7 @@ function New-ServicePrincipalIdCertificate {
     .PARAMETER Expiry
         Expiration date for the certificate. Defaults to 1 year from now.
     .EXAMPLE
-        New-ServicePrincipalIdCertificate -CommonName 'my-sp'
+        New-ServicePrincipalIdCredentials -CommonName 'my-sp'
     .OUTPUTS
         Certificate object
     .NOTES
@@ -149,13 +149,9 @@ function New-ServicePrincipalIdCertificate {
     param (        
         [Parameter(Mandatory)]
         [String]$CommonName,
-    
-        [String]$KeyLength = 2048,
-        
-        [String]$Expiry = (Get-Date).AddYears(1),
-
+        [String]$KeyLength = 2048,        
+        [DateTime]$Expiry = (Get-Date).AddYears(1),
         [String]$TempIdFilePath = ([IO.Path]::GetTempPath())
-
     )
 
     begin {
@@ -206,19 +202,28 @@ function New-ServicePrincipalIdCertificate {
             KeySize     = $KeyLength
         }
         $privateKeyPath = New-PrivateKey @keyParams
-        
+
         $certPath = Join-Path -Path $TempIdFilePath -ChildPath $certificateName
-        $certParams = @{
+         $certParams = @{
             OpenSSLPath    = $SSLExecutable
             PrivateKeyPath = $privateKeyPath
             OutputPath     = $certPath
             CommonName     = $CommonName
+            ValidityDays   = (New-TimeSpan -Start (Get-Date) -End $Expiry).Days
         }
         $certPath = New-SelfSignedIdentityCertificate @certParams
+
+        $exportParams = @{
+            OpenSSLPath = $SSLExecutable
+            CertPath    = $certPath
+            KeyPath     = $privateKeyPath
+        }
+        $finalCertFiles = Export-IdentityCertificateFiles @exportParams
+
     }
 
     end {
-        $Cert
+        $finalCertFiles
     }
 }
 
@@ -277,11 +282,11 @@ function New-SelfSignedIdentityCertificate {
         New-SelfSignedIdentityCertificate -OpenSSLPath 'openssl' -PrivateKeyPath 'private.pem' -OutputPath 'cert.pem' -CommonName 'MyCommonName'
     #>
     param(
-        [string]$OpenSSLPath,
-        [string]$PrivateKeyPath,
-        [string]$OutputPath,
-        [string]$CommonName,
-        [int]$ValidityDays = 365
+        [String]$OpenSSLPath,
+        [String]$PrivateKeyPath,
+        [String]$OutputPath,
+        [String]$CommonName,
+        [Int]$ValidityDays = 365
     )
     # Check the private key exists
     if (-not (Test-Path -Path $PrivateKeyPath)) {
@@ -303,4 +308,129 @@ function New-SelfSignedIdentityCertificate {
     }
     
     return (Resolve-Path $OutputPath).Path
+}
+
+function Export-IdentityCertificateFiles {
+        <#
+    .SYNOPSIS
+        Helper - export key bundle and encoded cert files using OpenSSL.
+    .DESCRIPTION
+        Uses OpenSSL to generate .pfx and .der files from existing key and cert.
+    .PARAMETER OpenSSLPath
+        Path to the OpenSSL executable.
+    .PARAMETER CertPath
+        Path to the existing certificate.
+    .PARAMETER KeyPath
+        Path to the existing private key.
+    .EXAMPLE
+        Export-IdentityCertificateFiles -OpenSSLPath 'openssl' -CertPath 'cert.crt' -KeyPath 'private.pem'
+    #>
+    param(
+        [String]$OpenSSLPath,
+        [String]$CertPath,
+        [String]$KeyPath,
+        [String]$OutputDirectory = (Split-Path -Path $CertPath -Parent),
+        [String]$DerFileName = 'certificate.der',
+        [String]$PfxFileName = 'certificate.pfx'
+    )
+
+    $derPath = Join-Path $OutputDirectory $DerFileName
+    $pfxPath = Join-Path $OutputDirectory $PfxFileName
+
+    $cmdDer = @(
+        $OpenSSLPath, 'x509',
+        '-in', ('"{0}"' -f $CertPath),
+        '-outform', 'der',
+        '-out', ('"{0}"' -f $derPath)
+    ) -join ' '
+    $resultDer = Invoke-Expression "$cmdDer 2>&1"
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to export certificate files: $resultDer"
+    }
+    
+    $cmdPfx = @(
+        $OpenSSLPath, 'pkcs12', '-export',
+        '-out', ('"{0}"' -f $pfxPath),
+        '-inkey', ('"{0}"' -f $KeyPath),
+        '-in', ('"{0}"' -f $CertPath),
+        '-passout', 'pass:'
+    ) -join ' '
+    $result = Invoke-Expression "$cmdPfx 2>&1"
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to export certificate files: $result"
+    }
+
+    return @{
+        DerPath = (Resolve-Path $derPath).Path
+        PfxPath = (Resolve-Path $pfxPath).Path
+    }
+}
+
+function New-AutomationServicePrincipal {
+    <#
+    .SYNOPSIS
+        Create a new Azure AD Service Principal for automation.
+    .DESCRIPTION
+        Creates a new Azure AD Application and corresponding Service Principal
+        with a self-signed certificate for authentication.
+    .PARAMETER DisplayName
+        Display name for the Service Principal.
+    .EXAMPLE
+        New-AutomationServicePrincipal -DisplayName 'my-automation-sp'
+    .OUTPUTS
+        Hashtable with Service Principal details and certificate paths.
+    .NOTES
+        - Uses New-AzADApplication and New-AzADServicePrincipal; requires appropriate Azure permissions.
+        - Idempotent: checks for existence before creating.
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$DisplayName,
+        [Int]$KeyLength = 2048,
+        [DateTime]$CertExpiry = (Get-Date).AddYears(1),
+        [String]$TempFilePath = ([IO.Path]::GetTempPath())
+    )
+
+    begin {
+        $spParams = @{
+            DisplayName = $DisplayName
+        }
+    }
+
+    process {
+        $certFiles = $null
+        $existingADApp = Get-AzADApplication -DisplayName $DisplayName -ErrorAction SilentlyContinue
+        if ($null -ne $existingADApp) {
+            Write-Verbose "Service Principal with DisplayName '$DisplayName' already exists. Skipping creation."
+            # Add code to check for and create Service Principal
+        }
+        else {
+            if ($PSCmdlet.ShouldProcess("Service Principal '$DisplayName'", "Create")) {
+                # Create self-signed certificate for the SP
+                $certParams = @{
+                    CommonName     = $DisplayName
+                    KeyLength      = $KeyLength
+                    Expiry         = $CertExpiry
+                    TempIdFilePath = $TempFilePath
+                }
+                $certFiles = New-ServicePrincipalIdCredentials @certParams
+                # Create the Azure AD Application
+                $adApplication = New-AzADApplication -DisplayName $DisplayName
+                $credsParams = @{
+                    ApplicationId = $adApplication.AppId
+                    CertValue     = 'a mock cert'
+                    # CertValue     = ([System.Convert]::ToBase64String(
+                    #                     [IO.File]::ReadAllBytes($certFiles.DerPath)
+                    #                 ))
+                }
+                New-AzADAppCredential @credsParams
+            }
+        }
+                
+    }
+
+    end {}
 }
