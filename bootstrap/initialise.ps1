@@ -245,4 +245,46 @@ function Initialize-Bootstrap {
     Import-BootstrapDependencies -DependencyFile $DependenciesPath
 }
 
+function Import-IaCAzureBackendModules {
+    <#
+    .SYNOPSIS
+        Import modules required for Azure backend provisioning for IaC.
+    .DESCRIPTION
+        Installs and imports specific versions of PowerShell modules
+        required for provisioning Azure backend resources for Infrastructure as Code (IaC).
+        This includes modules for Azure management and storage account handling.
+    .EXAMPLE
+        Import-IaCAzureBackendModules
+    .NOTES
+        Uses Ensure-ModuleVersion to guarantee specific module versions.
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [object]$Module
+    )
 
+    $allModules = @(
+        'AzureBootstrap'
+        'AzureStorage'
+        'AzureIdentity'
+    )
+
+    $Modules = if ($Module -is [string]) {
+        @($Module)
+    } else {
+        $Module
+    }
+    if (-not $Module) {
+        $Modules = $allModules
+    }
+    $Modules | ForEach-Object {
+        if (-not ($_ -in $allModules)) {
+            Write-Warning "Module '$_'  is not a valid bootstrap module and will be skipped."
+        }
+        else {
+            $fullPath = Join-Path $PSScriptRoot $_
+            Import-Module -Name $fullPath -Force -Verbose
+        }
+    }
+}

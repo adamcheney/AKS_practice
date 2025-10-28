@@ -448,12 +448,39 @@ Describe "Initialize-Bootstrap" -Tag 'Unit' {
 Describe "Import-IaCAzureBackendModules" -Tag 'Unit' {
     BeforeAll {
         Mock Import-Module {}
+        Mock Write-Warning {}
+    }
+    Context "When specific modules are specified in an array" {
+        It "Should import the specified modules" {
+            Import-IaCAzureBackendModules -Module @('AzureBootstrap', 'AzureIdentity')
+            Should -Invoke Import-Module -ParameterFilter { $Name -like '*AzureBootstrap*' } -Times 1
+            Should -Invoke Import-Module -ParameterFilter { $Name -like '*AzureIdentity*' } -Times 1
+            Should -Invoke Import-Module -ParameterFilter { $Name -like '*AzureStorage*' } -Times 0
+        }
     }
     Context "When modules are not specified" {
         It "Should import default modules" {
             Import-IaCAzureBackendModules
-            Should -Invoke Import-Module -ParameterFilter { $Name -eq '}
+            Should -Invoke Import-Module -ParameterFilter { $Name -like '*AzureBootstrap*' } -Times 1
+            Should -Invoke Import-Module -ParameterFilter { $Name -like '*AzureIdentity*' } -Times 1
+            Should -Invoke Import-Module -ParameterFilter { $Name -like '*AzureStorage*' } -Times 1
+        }
+    }
+    Context "When incorrect module is specified" {
+        It "Should warn and not import module" {
+            Import-IaCAzureBackendModules -Module @('SomethingSomething')
+            Should -Invoke Import-Module -Times 0
+            Should -Invoke Write-Warning -ParameterFilter { $Message -like '*SomethingSomething*' } -Times 1
+        }
+    }
+    Context "When a single string is passed" {
+        It "Should import the specified module" {
+            Import-IaCAzureBackendModules -Module 'AzureBootstrap'
+            Should -Invoke Import-Module -ParameterFilter { $Name -like '*AzureBootstrap*' } -Times 1
+        }
+    }
 }
+
 Describe "Initialize-IaCAzureBackend" -Tag 'Unit' {
     BeforeAll {
         Mock Load-Module {}
