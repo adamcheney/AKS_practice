@@ -402,10 +402,10 @@ function New-AutomationServicePrincipal {
 
     process {
         $certFiles = $null
-        $existingADApp = Get-AzADApplication -DisplayName $DisplayName -ErrorAction SilentlyContinue
-        if ($null -ne $existingADApp) {
+        $adApplication = $null
+        $adApplication = Get-AzADApplication -DisplayName $DisplayName -ErrorAction SilentlyContinue
+        if ($null -ne $adApplication) {
             Write-Verbose "Service Principal with DisplayName '$DisplayName' already exists. Skipping creation."
-            # Add code to check for and create Service Principal
         }
         else {
             if ($PSCmdlet.ShouldProcess("Service Principal '$DisplayName'", "Create")) {
@@ -419,18 +419,94 @@ function New-AutomationServicePrincipal {
                 $certFiles = New-ServicePrincipalIdCredentials @certParams
                 # Create the Azure AD Application
                 $adApplication = New-AzADApplication -DisplayName $DisplayName
-                $credsParams = @{
-                    ApplicationId = $adApplication.AppId
-                    CertValue     = 'a mock cert'
-                    # CertValue     = ([System.Convert]::ToBase64String(
-                    #                     [IO.File]::ReadAllBytes($certFiles.DerPath)
-                    #                 ))
-                }
-                New-AzADAppCredential @credsParams
+                
             }
+        }
+        # AD Application either was already extant or has just been created
+        $credsParams = @{
+            ObjectId  = $adApplication.AppId
+            CertValue = ConvertTo-Base64Certificate -CertPath $certFiles.DerPath
+        }
+        New-AzADAppCredential @credsParams
+
+        $sp = Get-AzADServicePrincipal -AppId $adApplication.AppId -ErrorAction SilentlyContinue
+        if (-not $sp) {
+            $sp = New-AzADServicePrincipal -AppId $adApplication.AppId
         }
                 
     }
 
     end {}
+}
+
+function ConvertTo-Base64Certificate {
+    <#
+    .SYNOPSIS
+        Helper - convert certificate to base64 string.
+    .DESCRIPTION
+        Reads a certificate file and converts its contents to a base64-encoded string.
+    .PARAMETER CertPath
+        Path to the certificate file.
+    .EXAMPLE
+        ConvertTo-Base64Certificate -CertPath 'certificate.der'
+    .OUTPUTS
+        Base64-encoded string of the certificate.
+    .NOTES
+        - .
+    #>
+    param (
+        [String]$CertPath
+    )
+
+    $certContent = Get-Content -Path $CertPath -Raw
+    return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($certContent))
+}
+
+function Get-AutomationServicePrincipalCredentialStatus {
+    #TODO: review and implement robust logic
+    <#
+    .SYNOPSIS
+        Check the credential status of an Azure AD Service Principal.
+    .DESCRIPTION
+        Retrieves the status of the credentials (certificates) associated with a specified Azure AD Service Principal.
+    .PARAMETER DisplayName
+        Display name of the Service Principal to check.
+    .EXAMPLE
+        Get-AutomationServicePrincipalCredentialStatus -DisplayName 'my-automation-sp'
+    .OUTPUTS
+        Hashtable with credential status details.
+    .NOTES
+        Fir first iteration, this is outside MVP - it's a TODO
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$DisplayName
+    )
+
+    begin {}
+
+    process {
+        $sp = Get-AzADApplication -DisplayName $DisplayName -ErrorAction SilentlyContinue
+        if ($null -eq $sp) {
+            throw "Service Principal with DisplayName '$DisplayName' does not exist."
+        }
+
+        $creds = $sp.KeyCredentials
+        $HasCreds = ($creds.Count -gt 0)
+        $Valid = $false
+        $DaysRemaining = $null
+        If ($HasCreds) {}
+            
+
+    }
+
+    end {
+        [pscustomobject]@{
+            Exists          = $true
+            HasCredentials  = ($creds.Count -gt 0)
+            Valid           = $creds.EndDateTime -gt (Get-Date)
+            DaysRemaining   = ($creds.EndDateTime - (Get-Date)).TotalDays
+        }
+    }
 }

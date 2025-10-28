@@ -402,7 +402,12 @@ InModuleScope AzureIdentity {
                     PfxPath = '/foo/bar/cert.pfx'
                 }
             }
+            Mock ConvertTo-Base64Certificate {
+                param($CertPath)
+                return "BASE64CERTDATA"
+            }
             Mock New-AzADAppCredential { $null }
+            Mock New-AzADServicePrincipal { $null }
             $identityParams = @{
                 DisplayName  = 'test-app'
                 KeyLength    = 2048
@@ -432,6 +437,13 @@ InModuleScope AzureIdentity {
                 New-AutomationServicePrincipal @identityParams
                 Should -Invoke New-AzADApplication -Times 0
             }
+            It "Should add the certificate credential to the application" {
+                New-AutomationServicePrincipal @identityParams
+                Should -Invoke New-AzADAppCredential -Times 1 -ParameterFilter {
+                    $ObjectId  -eq '00000000-0000-0000-0000-000000000001' -and
+                    $CertValue -eq 'BASE64CERTDATA'
+                }
+            }
         }
         Context "When AD Application does not exist" {
             BeforeAll {
@@ -457,6 +469,107 @@ InModuleScope AzureIdentity {
                     $DisplayName -eq 'test-app'
                 }
             }
+            It "Should add the certificate credential to the application" {
+                New-AutomationServicePrincipal @identityParams
+                Should -Invoke New-AzADAppCredential -Times 1 -ParameterFilter {
+                    $ObjectId  -eq '00000000-0000-0000-0000-000000000001' -and
+                    $CertValue -eq 'BASE64CERTDATA'
+                }
+            }
+        }
+        Context "When the corresponding Service Principal does not exist" {
+            BeforeAll {
+                Mock Get-AzADApplication  {
+                    [pscustomobject]@{
+                        AppId       = '00000000-0000-0000-0000-000000000001'
+                        DisplayName = 'test-app'
+                        Id          = 'app-object-id'
+                    }
+                }
+                Mock Get-AzADServicePrincipal { $null }
+                Mock New-AzADServicePrincipal {
+                    param($AppId)
+                    [pscustomobject]@{
+                        AppId       = $AppId
+                        DisplayName = 'test-app'
+                        Id          = 'sp-object-id'
+                    }
+                }
+            }
+            It "Should create the Service Principal for the application" {
+                New-AutomationServicePrincipal @identityParams
+                Should -Invoke New-AzADServicePrincipal -Times 1 -ParameterFilter {
+                    $AppId -eq '00000000-0000-0000-0000-000000000001'
+                }
+            }
+        }
+        Context "When the corresponding Service Principal already exists" {
+            BeforeAll {
+                Mock Get-AzADApplication  {
+                    [pscustomobject]@{
+                        AppId       = '00000000-0000-0000-0000-000000000001'
+                        DisplayName = 'test-app'
+                        Id          = 'app-object-id'
+                    }
+                }
+                Mock Get-AzADServicePrincipal {
+                    [pscustomobject]@{
+                        AppId       = '00000000-0000-0000-0000-000000000001'
+                        DisplayName = 'test-app'
+                        Id          = 'sp-object-id'
+                    }
+                }
+            }
+            It "Should not attempt to create a new Service Principal" {
+                New-AutomationServicePrincipal @identityParams
+                Should -Invoke New-AzADServicePrincipal -Times 0
+            }
         }
     }
+    # TODO: Implement tests for Get-AutomationServicePrincipalCredentialStatus
+    # Describe "Get-AutomationServicePrincipalCredentialStatus" {
+    #     BeforeAll {
+    #         $params = @{
+    #             DisplayName = 'test-app'
+    #         }
+    #     }
+    #     Context "When the AD Application does not exist" {
+    #         BeforeAll {
+    #             Mock Get-AzADApplication { $null }
+    #         }
+    #         It "Should return throw an error" {
+    #             { Get-AutomationServicePrincipalCredentialStatus @params } |
+    #             Should -Throw "Service Principal with DisplayName 'test-app' does not exist."
+    #         }
+    #     }
+    #     Context "When the AD Application exists and there is a valid credential" {
+    #         BeforeAll {
+    #             Mock Get-AzADApplication {
+    #                 param($DisplayName)
+    #                 [pscustomobject]@{
+    #                     AppId       = '00000000-0000-0000-0000-000000000001'
+    #                     DisplayName = $DisplayName
+    #                     Id          = 'app-object-id'
+    #                     KeyCredentials = @(
+    #                         [pscustomobject]@{
+    #                             StartDateTime = (Get-Date).AddDays(-1)
+    #                             EndDateTime   = (Get-Date).AddDays(300)
+    #                             CustomKeyIdentifier = 'base64-thumb'
+    #                             Type = 'AsymmetricX509Cert'
+    #                         }
+    #                     )
+    #                 }
+    #             }
+    #         }
+    #         It "Should return object with IsValidCredential = $true" {
+    #             $result = Get-AutomationServicePrincipalCredentialStatus @params
+    #             $result | Should -BeTrue
+    #         }
+    #         It "Should return object with remaining days > 0" {
+    #             $result = Get-AutomationServicePrincipalCredentialStatus @params
+    #             $result.RemainingDays | Should -BeGreaterThan 0
+    #         }
+    #     }
+    #     Context "When the AD Application exists but no valid credentials" {}
+    # }
 }
