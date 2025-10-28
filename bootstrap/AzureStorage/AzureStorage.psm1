@@ -7,7 +7,7 @@
     Intended to be used as a module (Import-Module) by bootstrap scripts and tooling.
 .EXAMPLE
     # Import the module for production or automated usage
-    Import-Module "$PSScriptRoot/az-storage.psm1" -Force
+    Import-Module "$PSScriptRoot/AzureStorage.psm1" -Force
     $saName = New-UniqueStorageAccountName -Prefix 'testacct'
 .NOTES
     - Designed for PowerShell Core (cross-platform).

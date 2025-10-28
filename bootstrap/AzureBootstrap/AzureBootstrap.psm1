@@ -9,7 +9,7 @@
       - Register required Azure resource providers
     Designed to be dot-sourced by bootstrap scripts in this repository.
 .EXAMPLE
-    Set up as a module - Load-Module .\bootstrap\az-bootstrap\az-bootstrap.psm1
+    Set up as a module - Load-Module .\bootstrap\AzureBootstrap\AzureBootstrap.psm1
     Then call functions, e.g.:
     $cfg = Get-InfraConfig -ConfigPath "$PSScriptRoot\infra-config.json"
 .NOTES

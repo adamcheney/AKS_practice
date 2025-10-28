@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Pester unit tests for the az-storage module.
+    Pester unit tests for the AzureStorage module.
 .DESCRIPTION
     Unit tests for:
       - New-UniqueStorageAccountName
@@ -10,16 +10,16 @@
     so tests are deterministic and side-effect free.
 .EXAMPLE
     # Run from repo root
-    Invoke-Pester -Path ./bootstrap/az-storage/az-storage.Tests.ps1
+    Invoke-Pester -Path ./bootstrap/AzureStorage/AzureStorage.Tests.ps1
 .NOTES
     - Requires Pester v5+ and PowerShell 7+ (Core).
-    - Imports az-storage.psm1 from the same directory and uses InModuleScope where appropriate.
+    - Imports AzureStorage.psm1 from the same directory and uses InModuleScope where appropriate.
     - Tests clear relevant environment variables and isolate mocks (BeforeAll/BeforeEach semantics).
 #>
-$modulePath = Join-Path $PSScriptRoot 'az-storage.psm1'
+$modulePath = Join-Path $PSScriptRoot 'AzureStorage.psm1'
 Import-Module $modulePath -Force
 
-InModuleScope az-storage {
+InModuleScope AzureStorage {
     Describe "New-UniqueStorageAccountName" {
         It "Should be a defined function" {
             $cmd = Get-Command -Name Set-AzureContext -ErrorAction Stop

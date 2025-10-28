@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Pester unit tests for az-bootstrap module helpers.
+    Pester unit tests for AzureBootstrap module helpers.
 .DESCRIPTION
     Unit tests for:
     - Get-InfraConfig
@@ -12,16 +12,16 @@
     side-effect free.
 .EXAMPLE
     # Run the tests from the repository root
-    Invoke-Pester -Path ./bootstrap/az-bootstrap/az-bootstrap.Tests.ps1
+    Invoke-Pester -Path ./bootstrap/AzureBootstrap/AzureBootstrap.Tests.ps1
 .NOTES
     - Requires Pester v5+ and PowerShell 7+ (PowerShell Core).
-    - The test file imports the module file az-bootstrap.psm1 from the same folder.
+    - The test file imports the module file AzureBootstrap.psm1 from the same folder.
     - Tests clear relevant AZURE_* environment variables to avoid leakage between runs.
 #>
-$modulePath = Join-Path $PSScriptRoot 'az-bootstrap.psm1'
+$modulePath = Join-Path $PSScriptRoot 'AzureBootstrap.psm1'
 Import-Module $modulePath -Force
 
-InModuleScope az-bootstrap { 
+InModuleScope AzureBootstrap { 
     Describe "Get-InfraConfig" -Tag 'Unit' {  
         BeforeEach {
             # Remove any existing EVs that may interfere with the test
