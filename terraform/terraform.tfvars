@@ -1,0 +1,5 @@
+vnet_address_space = ["10.0.0.0/16"]
+node_subnet_cidr = ["10.0.16.0/24"]
+pod_subnet_cidr = ["10.0.0.0/20"]
+ingress_subnet_cidr = ["10.0.17.0/27"]
+endpoints_subnet_cidr = ["10.0.17.32/27"]
