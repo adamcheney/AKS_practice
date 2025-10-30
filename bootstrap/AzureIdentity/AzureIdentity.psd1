@@ -10,6 +10,7 @@
         'Set-AzIdentityKeyVault'
         'New-ServicePrincipalIdCredentials'
         'New-AutomationServicePrincipal'
+        'Import-AzKeyVaultPfx'
     )
     CmdletsToExport = @()
     VariablesToExport = @()

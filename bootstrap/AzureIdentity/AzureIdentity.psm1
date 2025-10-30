@@ -409,20 +409,19 @@ function New-AutomationServicePrincipal {
         }
         else {
             if ($PSCmdlet.ShouldProcess("Service Principal '$DisplayName'", "Create")) {
-                # Create self-signed certificate for the SP
-                $certParams = @{
-                    CommonName     = $DisplayName
-                    KeyLength      = $KeyLength
-                    Expiry         = $CertExpiry
-                    TempIdFilePath = $TempFilePath
-                }
-                $certFiles = New-ServicePrincipalIdCredentials @certParams
                 # Create the Azure AD Application
                 $adApplication = New-AzADApplication -DisplayName $DisplayName
-                
             }
         }
         # AD Application either was already extant or has just been created
+        # Create self-signed certificate for the SP
+        $certParams = @{
+            CommonName     = $DisplayName
+            KeyLength      = $KeyLength
+            Expiry         = $CertExpiry
+            TempIdFilePath = $TempFilePath
+        }
+        $certFiles = New-ServicePrincipalIdCredentials @certParams
         $credsParams = @{
             ObjectId  = $adApplication.AppId
             CertValue = ConvertTo-Base64Certificate -CertPath $certFiles.DerPath
@@ -433,10 +432,14 @@ function New-AutomationServicePrincipal {
         if (-not $sp) {
             $sp = New-AzADServicePrincipal -AppId $adApplication.AppId
         }
-                
     }
 
-    end {}
+    end {
+        [PSCustomObject]@{
+            AppId          = $adApplication.AppId
+            PFXFilePath    = $certFiles.PfxPath
+        }
+    }
 }
 
 function ConvertTo-Base64Certificate {
@@ -462,51 +465,70 @@ function ConvertTo-Base64Certificate {
     return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($certContent))
 }
 
-function Get-AutomationServicePrincipalCredentialStatus {
-    #TODO: review and implement robust logic
+function Import-AzKeyVaultPfx {
     <#
     .SYNOPSIS
-        Check the credential status of an Azure AD Service Principal.
+        Import a PFX certificate into Azure Key Vault as a secret.
     .DESCRIPTION
-        Retrieves the status of the credentials (certificates) associated with a specified Azure AD Service Principal.
-    .PARAMETER DisplayName
-        Display name of the Service Principal to check.
+        Reads a PFX file, encodes it in base64, and stores it as a secret in the specified Azure Key Vault.
+    .PARAMETER VaultName
+        Name of the Azure Key Vault to import the certificate into.
+    .PARAMETER PfxPath
+        Path to the PFX file to import.
     .EXAMPLE
-        Get-AutomationServicePrincipalCredentialStatus -DisplayName 'my-automation-sp'
-    .OUTPUTS
-        Hashtable with credential status details.
+        Import-AzKeyVaultPfx -VaultName 'my-vault' -PfxPath 'certificate.pfx'
     .NOTES
-        Fir first iteration, this is outside MVP - it's a TODO
+        - .
     #>
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
-        [String]$DisplayName
+        [Parameter(Mandatory)]
+        [String]$VaultName,
+        [Parameter(Mandatory)]
+        [String]$PfxPath,
+        [String]$SecretName = 'cheneyaw-aks-iac'
     )
 
-    begin {}
-
+    begin {
+        if (-not (Test-Path -Path $PfxPath)) {
+            throw "PFX file '$PfxPath' does not exist."
+        }
+       
+    }
     process {
-        $sp = Get-AzADApplication -DisplayName $DisplayName -ErrorAction SilentlyContinue
-        if ($null -eq $sp) {
-            throw "Service Principal with DisplayName '$DisplayName' does not exist."
+        $base64 = ConvertTo-Base64Binary -PfxPath $PfxPath
+        $secret = @{
+            Name  = $SecretName
+            Value = $base64
         }
-
-        $creds = $sp.KeyCredentials
-        $HasCreds = ($creds.Count -gt 0)
-        $Valid = $false
-        $DaysRemaining = $null
-        If ($HasCreds) {}
-            
-
+        $secureValue = ConvertTo-SecureString -String $base64 -AsPlainText -Force
+        $SPIdentityItem = Set-AzKeyVaultSecret -VaultName $VaultName -Name $secret.Name -SecretValue $secureValue.Value
     }
-
+    
     end {
-        [pscustomobject]@{
-            Exists          = $true
-            HasCredentials  = ($creds.Count -gt 0)
-            Valid           = $creds.EndDateTime -gt (Get-Date)
-            DaysRemaining   = ($creds.EndDateTime - (Get-Date)).TotalDays
-        }
+        $SPIdentityItem
     }
+}
+function ConvertTo-Base64Binary {
+    <#
+    .SYNOPSIS
+        Convert a binary keypair file (PFX/DER) to Base64.
+    .DESCRIPTION
+        Reads a binary keypair file and converts its contents to a base64-encoded string.
+    .PARAMETER PfxPath
+        Path to the binary pfx file.
+    .EXAMPLE    
+        ConvertTo-Base64Binary -Path 'keypair.pfx'
+    .OUTPUTS
+        Base64-encoded string of the binary file.
+    .NOTES
+        - . 
+        #>
+    param(
+        [Parameter(Mandatory)]
+        [String]$PfxPath
+    )
+
+    $bytes = [IO.File]::ReadAllBytes($PfxPath)
+    return [Convert]::ToBase64String($bytes)
 }

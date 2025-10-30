@@ -20,7 +20,7 @@ $modulePath = Join-Path $PSScriptRoot 'AzureStorage.psm1'
 Import-Module $modulePath -Force
 
 InModuleScope AzureStorage {
-    Describe "New-UniqueStorageAccountName" {
+    Describe "New-UniqueStorageAccountName" -Tag 'Unit' {
         It "Should be a defined function" {
             $cmd = Get-Command -Name Set-AzureContext -ErrorAction Stop
             $cmd | Should -Not -BeNullOrEmpty

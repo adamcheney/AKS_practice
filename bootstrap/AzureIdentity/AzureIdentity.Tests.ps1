@@ -18,7 +18,7 @@ $modulePath = Join-Path $PSScriptRoot 'AzureIdentity.psm1'
 Import-Module $modulePath -Force
 
 InModuleScope AzureIdentity {
-    Describe "Set-AzIdentityKeyVault" {
+    Describe "Set-AzIdentityKeyVault" -Tag 'Unit' {
         BeforeAll {
             Mock Get-AzResourceGroup {
                 param($Name)
@@ -81,7 +81,7 @@ InModuleScope AzureIdentity {
             }
         }
     }
-    Describe "New-ServicePrincipalIdCredentials" {
+    Describe "New-ServicePrincipalIdCredentials" -Tag 'Unit' {
         BeforeAll {
             $credsParams = @{
                 CommonName     = 'MySP'
@@ -256,7 +256,7 @@ InModuleScope AzureIdentity {
             }
         }
     }
-    Describe "Get-OpenSSLInfo" {
+    Describe "Get-OpenSSLInfo" -Tag 'Unit' {
         BeforeAll {
             Mock Get-Command { @{ Source = 'openssl' } }
             Mock Invoke-Expression { "OpenSSL 3.3.1" }
@@ -279,7 +279,7 @@ InModuleScope AzureIdentity {
             }
         }
     }
-    Describe "New-PrivateKey" {
+    Describe "New-PrivateKey" -Tag 'Unit' {
         BeforeAll {
             $params = @{
                 OpenSSLPath = 'openssl'
@@ -291,7 +291,7 @@ InModuleScope AzureIdentity {
             BeforeEach {
                 Mock Invoke-Expression { "OK" }
                 Mock Resolve-Path {
-                    [pscustomobject]@{ 
+                    [PSCustomObject]@{ 
                         Path = (Join-Path (Get-Location) 'private.pem')
                     }
                 }
@@ -318,7 +318,7 @@ InModuleScope AzureIdentity {
             }
         }
     }
-    Describe "New-SelfSignedIdentityCertificate" {
+    Describe "New-SelfSignedIdentityCertificate" -Tag 'Unit' {
         BeforeAll {}
         BeforeEach { $global:LASTEXITCODE = 0 }
         Context "When OpenSSL is installed and works" {
@@ -326,7 +326,7 @@ InModuleScope AzureIdentity {
                 Mock Invoke-Expression { "OK" }
                 Mock Test-Path { $true }
                 Mock Resolve-Path {
-                    [pscustomobject]@{
+                    [PSCustomObject]@{
                         Path = (Join-Path (Get-Location) 'cert.pem')
                     }
                 }
@@ -353,7 +353,7 @@ InModuleScope AzureIdentity {
             }
         }
     }
-    Describe "Export-IdentityCertificateFiles" {
+    Describe "Export-IdentityCertificateFiles" -Tag 'Unit' {
         BeforeAll {
             $exportParams = @{
                 OpenSSLPath = 'openssl'
@@ -367,7 +367,7 @@ InModuleScope AzureIdentity {
                 Mock Test-Path { $true }
                 Mock Resolve-Path {
                     param($Path)
-                    [pscustomobject]@{
+                    [PSCustomObject]@{
                         Path = $Path
                     }
                 }
@@ -394,7 +394,7 @@ InModuleScope AzureIdentity {
             }
         }
     }
-    Describe "New-AutomationServicePrincipal" {
+    Describe "New-AutomationServicePrincipal" -Tag 'Unit' {
         BeforeAll {
             Mock New-ServicePrincipalIdCredentials {
                 @{
@@ -414,6 +414,14 @@ InModuleScope AzureIdentity {
                 CertExpiry   = (Get-Date).AddYears(1)
                 TempFilePath = '/foo/bar'
             }
+            Mock Set-AzIdentityKeyVault {
+                param($VaultName, $ResourceGroupName, $Location)
+                [PSCustomObject]@{
+                    VaultName         = $VaultName
+                    ResourceGroupName = $ResourceGroupName
+                    Location          = $Location
+                }
+            }
         }
         It "Should be a defined function" {
             $cmd = Get-Command -Name New-AutomationServicePrincipal -ErrorAction Stop
@@ -425,7 +433,7 @@ InModuleScope AzureIdentity {
         Context "When AD Application already exists" {
             BeforeAll {
                 Mock Get-AzADApplication {
-                    [pscustomobject]@{
+                    [PSCustomObject]@{
                         AppId       = '00000000-0000-0000-0000-000000000001'
                         DisplayName = 'test-app'
                         Id          = 'app-object-id'
@@ -450,7 +458,7 @@ InModuleScope AzureIdentity {
                 Mock Get-AzADApplication { $null }
                 Mock New-AzADApplication {
                     param($DisplayName)
-                    [pscustomobject]@{
+                    [PSCustomObject]@{
                         AppId       = '00000000-0000-0000-0000-000000000001'
                         DisplayName = $DisplayName
                         Id          = 'new-app-object-id'
@@ -480,7 +488,7 @@ InModuleScope AzureIdentity {
         Context "When the corresponding Service Principal does not exist" {
             BeforeAll {
                 Mock Get-AzADApplication  {
-                    [pscustomobject]@{
+                    [PSCustomObject]@{
                         AppId       = '00000000-0000-0000-0000-000000000001'
                         DisplayName = 'test-app'
                         Id          = 'app-object-id'
@@ -489,7 +497,7 @@ InModuleScope AzureIdentity {
                 Mock Get-AzADServicePrincipal { $null }
                 Mock New-AzADServicePrincipal {
                     param($AppId)
-                    [pscustomobject]@{
+                    [PSCustomObject]@{
                         AppId       = $AppId
                         DisplayName = 'test-app'
                         Id          = 'sp-object-id'
@@ -506,14 +514,14 @@ InModuleScope AzureIdentity {
         Context "When the corresponding Service Principal already exists" {
             BeforeAll {
                 Mock Get-AzADApplication  {
-                    [pscustomobject]@{
+                    [PSCustomObject]@{
                         AppId       = '00000000-0000-0000-0000-000000000001'
                         DisplayName = 'test-app'
                         Id          = 'app-object-id'
                     }
                 }
                 Mock Get-AzADServicePrincipal {
-                    [pscustomobject]@{
+                    [PSCustomObject]@{
                         AppId       = '00000000-0000-0000-0000-000000000001'
                         DisplayName = 'test-app'
                         Id          = 'sp-object-id'
@@ -525,9 +533,91 @@ InModuleScope AzureIdentity {
                 Should -Invoke New-AzADServicePrincipal -Times 0
             }
         }
+        Context "When it all works" {
+            BeforeAll {
+                Mock Get-AzADServicePrincipal { $null }
+                Mock Get-AzADApplication { $null }
+                Mock New-AzADApplication {
+                    param($DisplayName)
+                    [PSCustomObject]@{
+                        AppId       = '00000000-0000-0000-0000-000000000001'
+                        DisplayName = $DisplayName
+                        Id          = 'new-app-object-id'
+                    }
+                }
+                Mock New-AzADServicePrincipal {
+                    param($AppId)
+                    [PSCustomObject]@{
+                        AppId       = $AppId
+                        DisplayName = 'test-app'
+                        Id          = 'sp-object-id'
+                    }
+                }
+            }
+            It "Should return an object with AppId and PFXFilePath" {
+                $result = New-AutomationServicePrincipal @identityParams
+                $result.AppId | Should -Be '00000000-0000-0000-0000-000000000001'
+                $result.PFXFilePath | Should -Be '/foo/bar/cert.pfx'
+            }
+        }
+    }
+    Describe "Import-AzKeyVaultPfx" -Tag 'Unit' {
+        BeforeAll {
+            $keyParams = @{
+                VaultName   = 'testvault'
+                PfxPath = '/foo/bar/cert.pfx'
+                SecretName  = 'cheneyaw-aks-iac'
+            }
+            Mock Set-AzKeyVaultSecret {
+                param($VaultName, $Name, $SecretValue)
+                [PSCustomObject]@{
+                    Name  = $Name
+                    Value = $SecretValue
+                    VaultName = $VaultName
+                    Expires = (Get-Date).AddYears(1)
+                    Id          = "https://$VaultName.vault.azure.net/secrets/$Name"
+                }
+            }
+            Mock ConvertTo-Base64Binary {
+                param($PfxPath)
+                return "BASE64PFXDATA"
+            }
+            $secureValue = ConvertTo-SecureString -String "BASE64PFXDATA" -AsPlainText -Force
+        }
+        Context "When the PFX file does not exist" {
+            BeforeAll {
+                Mock Test-Path { $false }
+            }
+            It "Should throw an error" {
+                { Import-AzKeyVaultPfx @keyParams } |
+                Should -Throw "PFX file '/foo/bar/cert.pfx' does not exist."
+            }
+        }
+        Context "When the PFX file exists" {
+            BeforeAll {
+                Mock Test-Path { $true }
+            }
+            It "Should import the PFX file into the Key Vault" {
+                { Import-AzKeyVaultPfx @keyParams } |
+                Should -Not -Throw  
+            }
+            It "Should call ConvertTo-Base64Binary with correct parameters" {
+                Import-AzKeyVaultPfx @keyParams
+                Should -Invoke ConvertTo-Base64Binary -Times 1 -ParameterFilter {
+                    $PfxPath -eq '/foo/bar/cert.pfx'
+                }
+            }
+            It "Should call Set-AzKeyVaultSecret with correct parameters" {
+                Import-AzKeyVaultPfx @keyParams
+                Should -Invoke Set-AzKeyVaultSecret -Times 1 -ParameterFilter {
+                    $VaultName   -eq 'testvault' -and
+                    $Name        -eq 'cheneyaw-aks-iac'
+                }
+            }
+        }
     }
     # TODO: Implement tests for Get-AutomationServicePrincipalCredentialStatus
-    # Describe "Get-AutomationServicePrincipalCredentialStatus" {
+    # Describe "Get-AutomationServicePrincipalCredentialStatus" -Tag 'Unit' {
     #     BeforeAll {
     #         $params = @{
     #             DisplayName = 'test-app'
@@ -546,12 +636,12 @@ InModuleScope AzureIdentity {
     #         BeforeAll {
     #             Mock Get-AzADApplication {
     #                 param($DisplayName)
-    #                 [pscustomobject]@{
+    #                 [PSCustomObject]@{
     #                     AppId       = '00000000-0000-0000-0000-000000000001'
     #                     DisplayName = $DisplayName
     #                     Id          = 'app-object-id'
     #                     KeyCredentials = @(
-    #                         [pscustomobject]@{
+    #                         [PSCustomObject]@{
     #                             StartDateTime = (Get-Date).AddDays(-1)
     #                             EndDateTime   = (Get-Date).AddDays(300)
     #                             CustomKeyIdentifier = 'base64-thumb'
