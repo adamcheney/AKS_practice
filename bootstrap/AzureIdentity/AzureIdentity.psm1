@@ -502,7 +502,7 @@ function Import-AzKeyVaultPfx {
             Value = $base64
         }
         $secureValue = ConvertTo-SecureString -String $base64 -AsPlainText -Force
-        $SPIdentityItem = Set-AzKeyVaultSecret -VaultName $VaultName -Name $secret.Name -SecretValue $secureValue.Value
+        $SPIdentityItem = Set-AzKeyVaultSecret -VaultName $VaultName -Name $secret.Name -SecretValue $secureValue
     }
     
     end {
@@ -531,4 +531,40 @@ function ConvertTo-Base64Binary {
 
     $bytes = [IO.File]::ReadAllBytes($PfxPath)
     return [Convert]::ToBase64String($bytes)
+}
+
+function Set-AccessToKeyVault {
+    <#
+    .SYNOPSIS
+        Grant access to Key Vault for an identity entity.
+    .DESCRIPTION
+        Grants the specified access policy to a service principal or user for the given Key Vault.
+    .PARAMETER VaultName
+        Name of the Azure Key Vault.
+    .PARAMETER SignInName
+        Sign-in name (UPN) of the user or service principal to grant access to.
+    .PARAMETER SubscriptionId
+        Subscription ID where the Key Vault resides.
+    .PARAMETER ResourceGroupName
+        Resource group name where the Key Vault resides.
+    .EXAMPLE
+        Set-AccessToKeyVault -VaultName 'my-vault' -SignInName 'user@domain.com' -SubscriptionId 'sub-id' -ResourceGroupName 'rg-name'
+    .NOTES
+        - .
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param (
+        [Parameter(Mandatory)]
+        [String]$VaultName,
+        [Parameter(Mandatory)]
+        [String]$SignInName,
+        [Parameter(Mandatory)]
+        [String]$SubscriptionId,
+        [Parameter(Mandatory)]
+        [String]$ResourceGroupName,
+        [string]$ServicePrincipalId
+    )
+
+
+    
 }
