@@ -200,14 +200,14 @@ function Register-RequiredAzResourceProviders {
     )
 
     begin {
+        if (-not (Test-Path -Path $DependencyFile)) {
+            throw "Dependency file '$DependencyFile' not found."
+        }
         Write-Verbose "Loading required Azure Resource Providers from '$DependencyFile'..."
         $requiredProviders = @()
     }
 
     process {
-        if (-not (Test-Path -Path $DependencyFile)) {
-            throw "Dependency file '$DependencyFile' not found."
-        }
         try {
             $Providers = (Import-PowerShellDataFile -Path $DependencyFile).RequiredProviders
         }
