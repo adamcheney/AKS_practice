@@ -161,14 +161,14 @@ function Import-BootstrapDependencies {
     )
 
     begin {
+        if (-not (Test-Path -Path $DependencyFile)) {
+            throw "Dependency file '$DependencyFile' not found."
+        }
         Write-Verbose "Importing dependencies from $DependencyFile"
         Set-PSResourceGetv3 -Version '1.1.1'
     }
 
     process {
-        if (-not (Test-Path -Path $DependencyFile)) {
-            throw "Dependency file '$DependencyFile' not found."
-        }
         try {
             $Dependencies = (Import-PowerShellDataFile -Path $DependencyFile).RequiredModules
         }
@@ -305,8 +305,18 @@ function Initialize-Bootstrap {
 
     # Get the config from the infra-config.json file
     $config = Get-InfraConfig -ConfigPath './infra-config.json'
-    
 
+    # Ensure we're logged in or request login
+    Set-AzureContext
+
+    # All resources need the resource group to exist
+    Set-AzResourceGroup -Name $config.resourceGroup.Name -Location $config.resourceGroup.Location
+
+    # Register required resource providers
+    Register-RequiredAzResourceProviders -DependencyFile $DependenciesPath
+    
+    # Create the service principal for automation if it doesn't exist
+    New-AutomationServicePrincipal -DisplayName $config.ServicePrincipal.DisplayName -KeyLength 2048
 }
 
 function Clear-BootstrapEnvironment {

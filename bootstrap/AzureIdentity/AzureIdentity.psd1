@@ -23,4 +23,4 @@
             ReleaseNotes = 'Initial manifest'
         }
     }
-}
+    }

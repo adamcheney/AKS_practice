@@ -57,15 +57,13 @@ function Set-AzIdentityKeyVault {
         
         [String]$Sku = 'Standard'
     )
-
-    begin {
+    
+    process {
         # Begin by confirming the Resource Group exists and throwing if not
         if ( $null -eq (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue) ) {
             throw "Resource Group '$ResourceGroupName' does not exist."
         }
-    }
-    
-    process {
+
         # Check if the Key Vault already exists
         $keyVaultParams = @{
             Name              = $VaultName
@@ -87,10 +85,7 @@ function Set-AzIdentityKeyVault {
                 Write-Verbose "Key Vault '$VaultName' creation skipped by ShouldProcess."
             }
         }
-    }
-
-    end {
-        $KeyVault
+        return $KeyVault
     }
 }
 
@@ -132,6 +127,11 @@ function New-ServicePrincipalIdCredentials {
     .DESCRIPTION
         This function creates a new self-signed certificate for a service principal
         and stores it in the specified certificate store.
+    .PARAMETER KeyDetails
+        PSCustomObject containing:
+            CommonName - Common name (CN) for the certificate - the ServicePrincipal name - required;
+            KeyLength - Key length for the certificate, defaults to 2048 if not present;
+            Expiry - Expiration date for the certificate, details to 1 year from now if not present.
     .PARAMETER CommonName
         Common name (CN) for the certificate - the ServicePrincipal name.
     .PARAMETER KeyLength
@@ -194,8 +194,8 @@ function New-ServicePrincipalIdCredentials {
     }
 
     process {
-        $privateKeyName  = "temp-private.pem"
-        $certificateName = "temp-cert.crt"
+        $privateKeyName  = $CommonName + ".temp-pkey.pem"
+        $certificateName = $CommonName + ".temp-cert.crt"
         $keyParams = @{
             OpenSSLPath = $SSLExecutable
             OutputPath  = Join-Path -Path $TempIdFilePath -ChildPath $privateKeyName
@@ -204,7 +204,7 @@ function New-ServicePrincipalIdCredentials {
         $privateKeyPath = New-PrivateKey @keyParams
 
         $certPath = Join-Path -Path $TempIdFilePath -ChildPath $certificateName
-         $certParams = @{
+        $certParams = @{
             OpenSSLPath    = $SSLExecutable
             PrivateKeyPath = $privateKeyPath
             OutputPath     = $certPath
@@ -217,13 +217,15 @@ function New-ServicePrincipalIdCredentials {
             OpenSSLPath = $SSLExecutable
             CertPath    = $certPath
             KeyPath     = $privateKeyPath
+            CommonName  = $CommonName
         }
         $finalCertFiles = Export-IdentityCertificateFiles @exportParams
-
-    }
-
-    end {
-        $finalCertFiles
+        
+        return [PSCustomObject]@{
+            CommonName = $CommonName
+            DerPath    = $finalCertFiles.DerPath
+            PfxPath    = $finalCertFiles.PfxPath
+        }
     }
 }
 
@@ -311,7 +313,7 @@ function New-SelfSignedIdentityCertificate {
 }
 
 function Export-IdentityCertificateFiles {
-        <#
+    <#
     .SYNOPSIS
         Helper - export key bundle and encoded cert files using OpenSSL.
     .DESCRIPTION
@@ -394,27 +396,12 @@ function New-AutomationServicePrincipal {
         [String]$TempFilePath = ([IO.Path]::GetTempPath())
     )
 
-    begin {
-        $spParams = @{
-            DisplayName = $DisplayName
-        }
-    }
-
     process {
         $certFiles = $null
         $adApplication = $null
-        $adApplication = Get-AzADApplication -DisplayName $DisplayName -ErrorAction SilentlyContinue
-        if ($null -ne $adApplication) {
-            Write-Verbose "Service Principal with DisplayName '$DisplayName' already exists. Skipping creation."
+        $spParams = @{
+            DisplayName = $DisplayName
         }
-        else {
-            if ($PSCmdlet.ShouldProcess("Service Principal '$DisplayName'", "Create")) {
-                # Create the Azure AD Application
-                $adApplication = New-AzADApplication -DisplayName $DisplayName
-            }
-        }
-        # AD Application either was already extant or has just been created
-        # Create self-signed certificate for the SP
         $certParams = @{
             CommonName     = $DisplayName
             KeyLength      = $KeyLength
@@ -422,21 +409,30 @@ function New-AutomationServicePrincipal {
             TempIdFilePath = $TempFilePath
         }
         $certFiles = New-ServicePrincipalIdCredentials @certParams
-        $credsParams = @{
-            ObjectId  = $adApplication.AppId
-            CertValue = ConvertTo-Base64Certificate -CertPath $certFiles.DerPath
+        $adApplication = Get-AzADApplication -DisplayName $DisplayName -ErrorAction SilentlyContinue
+        if ($null -ne $adApplication) {
+            Write-Verbose "Service Principal with DisplayName '$DisplayName' already exists. Skipping creation."
         }
-        New-AzADAppCredential @credsParams
+        else {
+            if ($PSCmdlet.ShouldProcess("AD Application '$DisplayName'", "Create")) {
+                # Create the Azure AD Application
+                $adApplication = New-AzADApplication -DisplayName $DisplayName
+            }
+        }
 
         $sp = Get-AzADServicePrincipal -AppId $adApplication.AppId -ErrorAction SilentlyContinue
         if (-not $sp) {
             $sp = New-AzADServicePrincipal -AppId $adApplication.AppId
         }
-    }
 
-    end {
-        [PSCustomObject]@{
-            AppId          = $adApplication.AppId
+        # Add the certificate credential to the AD Application
+        $credsParams = @{
+            ObjectId  = $adApplication.AppId
+            CertValue = ConvertTo-Base64Certificate -CertPath $certFiles.DerPath
+        }
+        New-AzADAppCredential @credsParams
+        return [PSCustomObject]@{
+            AppId          = [String]$adApplication.AppId
             PFXFilePath    = $certFiles.PfxPath
         }
     }
@@ -488,25 +484,15 @@ function Import-AzKeyVaultPfx {
         [String]$PfxPath,
         [String]$SecretName = 'cheneyaw-aks-iac'
     )
-
-    begin {
+    
+    process {
         if (-not (Test-Path -Path $PfxPath)) {
             throw "PFX file '$PfxPath' does not exist."
         }
-       
-    }
-    process {
         $base64 = ConvertTo-Base64Binary -PfxPath $PfxPath
-        $secret = @{
-            Name  = $SecretName
-            Value = $base64
-        }
         $secureValue = ConvertTo-SecureString -String $base64 -AsPlainText -Force
-        $SPIdentityItem = Set-AzKeyVaultSecret -VaultName $VaultName -Name $secret.Name -SecretValue $secureValue
-    }
-    
-    end {
-        $SPIdentityItem
+        $SPIdentityItem = Set-AzKeyVaultSecret -VaultName $VaultName -Name $SecretName -SecretValue $secureValue
+        return $SPIdentityItem
     }
 }
 function ConvertTo-Base64Binary {
@@ -557,14 +543,57 @@ function Set-AccessToKeyVault {
         [Parameter(Mandatory)]
         [String]$VaultName,
         [Parameter(Mandatory)]
-        [String]$SignInName,
-        [Parameter(Mandatory)]
         [String]$SubscriptionId,
         [Parameter(Mandatory)]
         [String]$ResourceGroupName,
-        [string]$ServicePrincipalId
+        [Parameter(ParameterSetName='Interactive', Mandatory)]
+        [String]$SignInName,
+        [Parameter(ParameterSetName='Automated', Mandatory)]
+        [String]$ServicePrincipalId
     )
 
+    begin {
+        # The role name
+        $roleName = 'Key Vault Certificates Officer'        
+    }
 
+    process {
+        # Confirm Key Vault exists
+        $keyVault = Get-AzKeyVault -VaultName $VaultName -ResourceGroupName $ResourceGroupName -ErrorAction Stop
     
+        $identityObjectId = $null
+        # If ServicePrincipalId not provided, assume this is a request for a user and validate
+        if (-not $ServicePrincipalId) {
+            $adUser = Get-AzADUser -UserPrincipalName $SignInName
+            if (-not $adUser) {
+                throw "Azure AD User with SignInName '$SignInName' not found and ServicePrincipalID not supplied."
+            }
+            $identityObjectId = $adUser.Id
+        }
+        # Otherwise this is a request for a service principal
+        else {
+            $adSP = Get-AzADServicePrincipal -ObjectId $ServicePrincipalId
+            if (-not $adSP) {
+                throw "Azure AD Service Principal with ObjectId '$ServicePrincipalId' not found and no SignInName supplied."
+            }
+            $identityObjectId = $adSP.Id
+        }
+        $scopeElements = @(
+            '/subscriptions/', $SubscriptionId,
+            '/resourceGroups/', $ResourceGroupName,
+            '/providers/Microsoft.KeyVault/vaults/', $VaultName
+        )
+        $scope = ($scopeElements -join '')
+
+        if ($PSCmdlet.ShouldProcess("Key Vault '$VaultName'", "Grant '$roleName' role to $identityObjectId")) {
+            $roleAssignment = New-AzRoleAssignment `
+                                -ObjectId $identityObjectId `
+                                -Scope $scope `
+                                -RoleDefinitionName $roleName
+            if ($roleAssignment) {
+                Write-Verbose "Granted '$roleName' role to identity with ObjectId '$identityObjectId' on Key Vault '$VaultName'."
+            }
+        }
+        return $roleAssignment
+    }
 }
