@@ -12,3 +12,5 @@
 **/coverage.xml
 bootstrap/temp-ignore/*
 
+**/temp/**
+**/temp_*

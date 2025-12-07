@@ -161,14 +161,14 @@ function Import-BootstrapDependencies {
     )
 
     begin {
+        if (-not (Test-Path -Path $DependencyFile)) {
+            throw "Dependency file '$DependencyFile' not found."
+        }
         Write-Verbose "Importing dependencies from $DependencyFile"
         Set-PSResourceGetv3 -Version '1.1.1'
     }
 
     process {
-        if (-not (Test-Path -Path $DependencyFile)) {
-            throw "Dependency file '$DependencyFile' not found."
-        }
         try {
             $Dependencies = (Import-PowerShellDataFile -Path $DependencyFile).RequiredModules
         }
@@ -219,32 +219,6 @@ function Import-BootstrapDependencies {
     }
 }
 
-function Initialize-Bootstrap {
-    <#
-    .SYNOPSIS
-        High-level initialization for bootstrap process.
-    .DESCRIPTION
-        Convenience wrapper that ensures PSResourceGet v3 is available and then
-        installs/imports modules defined in the dependencies PSD1 file.
-    .PARAMETER PSResourceGetVersion
-        Version of PSResourceGet to install/import (default '1.1.1').
-    .PARAMETER DependenciesPath
-        Path to the dependencies PSD1 file (default: dependencies.psd1 in this script folder).
-    .EXAMPLE
-        Initialize-Bootstrap -PSResourceGetVersion '1.1.1' -DependenciesPath "$PSScriptRoot\dependencies.psd1"
-    .NOTES
-        Calls Set-PSResourceGetv3 and Import-BootstrapDependencies.
-    #>
-    [CmdletBinding()]
-    param (
-        [String]$PSResourceGetVersion = '1.1.1',
-        [String]$DependenciesPath = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
-    )
-    
-    Set-PSResourceGetv3 -Version $PSResourceGetVersion
-    Import-BootstrapDependencies -DependencyFile $DependenciesPath
-}
-
 function Import-IaCAzureBackendModules {
     <#
     .SYNOPSIS
@@ -261,7 +235,7 @@ function Import-IaCAzureBackendModules {
     [CmdletBinding()]
     param (
         [Parameter()]
-        [object]$Module
+        [Object]$Module
     )
 
     $allModules = @(
@@ -287,4 +261,71 @@ function Import-IaCAzureBackendModules {
             Import-Module -Name $fullPath -Force -Verbose
         }
     }
+}
+
+function Set-InfraTrackingFile {
+    param (
+        [String]$FilePath = (Join-Path -Path $PSScriptRoot -ChildPath 'infra.json'),
+        [Hashtable]$Content
+    )
+
+    if (-not (Test-Path -Path $FilePath)) {
+        New-Item -Path $FilePath -ItemType File -Force | Out-Null
+    }
+    $Content.DateTime = (Get-Date).ToString("o")
+    $Content | ConvertTo-Json -Depth 10 | Set-Content -Path $FilePath -Force
+}
+
+function Initialize-Bootstrap {
+    <#
+    .SYNOPSIS
+        High-level initialization for bootstrap process.
+    .DESCRIPTION
+        Convenience wrapper that ensures PSResourceGet v3 is available and then
+        installs/imports modules defined in the dependencies PSD1 file.
+    .PARAMETER PSResourceGetVersion
+        Version of PSResourceGet to install/import (default '1.1.1').
+    .PARAMETER DependenciesPath
+        Path to the dependencies PSD1 file (default: dependencies.psd1 in this script folder).
+    .EXAMPLE
+        Initialize-Bootstrap -PSResourceGetVersion '1.1.1' -DependenciesPath "$PSScriptRoot\dependencies.psd1"
+    .NOTES
+        Calls Set-PSResourceGetv3 and Import-BootstrapDependencies.
+    #>
+    [CmdletBinding()]
+    param (
+        [String]$PSResourceGetVersion = '1.1.1',
+        [String]$DependenciesPath = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
+    )
+    
+    # Initialise the Powershell environment for bootstrap
+    Set-PSResourceGetv3 -Version $PSResourceGetVersion
+    Import-BootstrapDependencies -DependencyFile $DependenciesPath
+    Import-IaCAzureBackendModules
+
+    # Get the config from the infra-config.json file
+    $config = Get-InfraConfig -ConfigPath './infra-config.json'
+
+    # Ensure we're logged in or request login
+    Set-AzureContext
+
+    # All resources need the resource group to exist
+    Set-AzBootstrapResourceGroup -Name $config.resourceGroup.Name -Location $config.resourceGroup.Location
+
+    # Register required resource providers
+    Register-RequiredAzResourceProviders -DependencyFile $DependenciesPath
+    
+    # Create the service principal for automation if it doesn't exist
+    New-AutomationServicePrincipal -DisplayName $config.ServicePrincipal.DisplayName -KeyLength 2048
+}
+
+function Clear-BootstrapEnvironment {
+    # Remove any temporary files or resources created during the bootstrap process
+    Remove-Item -Path './infra-config.json' -Force -ErrorAction SilentlyContinue
+}
+
+function Set-AzureBootstrapResources {
+    param ()
+
+    $configParams 
 }

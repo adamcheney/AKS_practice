@@ -1,8 +1,8 @@
 {
-  "resourceGroup": {
-    "name": "cheneyaw-aks-iac",
-    "location": "uksouth",
-    "tags": {
+  "ResourceGroup": {
+    "Name": "cheneyaw-aks-iac",
+    "Location": "uksouth",
+    "Tags": {
       "Project": "AKS-Bootstrap-Lab",
       "Environment": "Training",
       "Owner": "Adam Cheney",
@@ -10,13 +10,16 @@
       "Purpose": "AKS Terraform/Pulumi training"
     }
   },
-  "storageAccount": {
-    "namePrefix": "cheneyawiacb",
-    "sku": "Standard_LRS"
+  "StorageAccount": {
+    "NamePrefix": "cheneyawiacb",
+    "Sku": "Standard_LRS"
+  },]
+  "KeyVault": {
+    "Name": "cheneyawiacauthn"
   },
-  "keyVault": {
-    "name": "cheneyawiacauthn"
+  "ServicePrincipal": {
+    "DisplayName": "cheneyaw-aks-iac"
   },
-  "terraform": { "containerName": "tfstate", "stateFile": "aks.tfstate" },
-  "pulumi": { "containerName": "pulumistate" }
+  "Terraform": { "ContainerName": "tfstate", "StateFile": "aks.tfstate" },
+  "Pulumi": { "ContainerName": "pulumistate" }
 }
