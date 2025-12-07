@@ -310,7 +310,7 @@ function Initialize-Bootstrap {
     Set-AzureContext
 
     # All resources need the resource group to exist
-    Set-AzResourceGroup -Name $config.resourceGroup.Name -Location $config.resourceGroup.Location
+    Set-AzBootstrapResourceGroup -Name $config.resourceGroup.Name -Location $config.resourceGroup.Location
 
     # Register required resource providers
     Register-RequiredAzResourceProviders -DependencyFile $DependenciesPath
