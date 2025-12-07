@@ -33,10 +33,6 @@ InModuleScope $ModuleName {
             }
             Mock Test-Path {
                 param($Path)
-                Return $null
-            } -ParameterFilter { $Path -eq 'duff.json' }
-            Mock Test-Path {
-                param($Path)
                 Return $true
             } -ParameterFilter { $Path -ne 'duff.json' }
             Mock Get-Content {
@@ -52,10 +48,6 @@ InModuleScope $ModuleName {
                 }
                 return ($testConfig | ConvertTo-Json -Depth 3)
             } -ParameterFilter { $Raw -and $Path -ne 'guff.json' }
-            Mock Get-Content {
-                param($Raw, $Path)
-                return "{ invalid json without closing brace"
-            } -ParameterFilter { $Raw -and $Path -eq 'guff.json' }
         }
         AfterEach {
             $EVs.GetEnumerator() | ForEach-Object {
@@ -95,12 +87,24 @@ InModuleScope $ModuleName {
             }
         }
         Context "When file path is invalid" {
+            BeforeAll {
+                Mock Test-Path {
+                    param($Path)
+                    Return $false
+                } -ParameterFilter { $Path -eq 'duff.json' }
+            }
             It "Should throw an error" {
                 { Get-InfraConfig -ConfigPath 'duff.json' } |
                    Should -Throw -ExpectedMessage "Config file not found at 'duff.json'.*"
             }
         }
         Context "When file is not valid JSON" {
+            BeforeAll {
+                Mock Get-Content {
+                    param($Raw, $Path)
+                    return "{ invalid json without closing brace"
+                } -ParameterFilter { $Raw -and $Path -eq 'guff.json' }
+            }
             It "Should throw an error" {
                 { Get-InfraConfig -ConfigPath 'guff.json' } |
                    Should -Throw -ExpectedMessage "Invalid JSON in config file 'guff.json'.*"
