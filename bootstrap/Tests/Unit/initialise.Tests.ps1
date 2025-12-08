@@ -26,7 +26,8 @@
 
 BeforeAll {
     # Dot-source the initialise script
-    . (Join-Path -Path $PSScriptRoot -ChildPath 'initialise.ps1')
+    $scriptDir = (Get-Item $PSScriptRoot).Parent.Parent
+    . (Join-Path -Path $scriptDir -ChildPath 'initialise.ps1')
 }
 
 Describe "Set-PSResourceGetv3" -Tag 'Unit' {
