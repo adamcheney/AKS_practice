@@ -32,13 +32,11 @@ function Get-RequiredModulesFromFile {
                 Throw "Failed to import dependency file '$DependencyFile'. Error: $($_.Exception.Message)"
             }
         }
-        if (-not $Dependencies.RequiredModules){
+        if (-not $Dependencies){
             # Might be an empty file of empty list of dependencies
             Write-Information "No RequiredModules found in '$DependencyFile'. Nothing to import."
             return
         }     
-        return $Dependencies.RequiredModulesgvvgfr2]   
+        return $Dependencies
     }
 }
-
-

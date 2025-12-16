@@ -1,4 +1,4 @@
-function Ensure-ModuleVersion {
+function Ensure-ModuleVersionImport {
     <#
     .SYNOPSIS
         Ensure a specific module version is imported into the session.
@@ -7,11 +7,11 @@ function Ensure-ModuleVersion {
         version is loaded, the loaded module is removed and the requested version
         is imported. Throws an error when the requested version is not installed.
     .PARAMETER ModuleName
-        The module name to ensure.
+        The module name.
     .PARAMETER ModuleVersion
         The exact module version required (string).
     .EXAMPLE
-        Ensure-ModuleVersion -ModuleName 'Az.Accounts' -ModuleVersion '2.0.0'
+        Ensure-ModuleVersionImport -ModuleName 'Az.Accounts' -ModuleVersion '2.0.0'
     .OUTPUTS
         The imported module object (PassThru) when import succeeds.
     .NOTES
@@ -26,11 +26,8 @@ function Ensure-ModuleVersion {
         [String]$ModuleVersion
     )
 
-    begin {
-        Write-Verbose "Ensuring module '$ModuleName' version '$ModuleVersion' is imported into session."
-    }
-
     process {
+        Write-Verbose "Ensuring module '$ModuleName' version '$ModuleVersion' is imported into session."
         # Check to see if the module is already installed and error if not
         $installed = Get-Module -Name $ModuleName -ListAvailable | Where-Object Version -eq $ModuleVersion
         if (-not $installed) {
@@ -59,9 +56,6 @@ function Ensure-ModuleVersion {
                 throw
             }
         }
-    }
-
-    end {
         Write-Verbose "Module '$ModuleName' version '$ModuleVersion' is imported successfully."
         return $import
     }

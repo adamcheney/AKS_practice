@@ -33,7 +33,7 @@ function Set-PSResourceGetV3 {
         }
         # Ensure I'm using the expected version
         if ($PSCmdlet.ShouldProcess("PSResourceGet","Ensure module version $Version is imported")) {
-            $importPSResourceGet = Ensure-ModuleVersion -ModuleName 'Microsoft.PowerShell.PSResourceGet' -ModuleVersion $Version
+            $importPSResourceGet = Ensure-ModuleVersionImport -ModuleName 'Microsoft.PowerShell.PSResourceGet' -ModuleVersion $Version
         }
 
         Write-Verbose "PSResourceGet v$Version is installed and imported."

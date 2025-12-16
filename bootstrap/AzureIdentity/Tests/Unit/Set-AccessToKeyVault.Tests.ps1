@@ -113,7 +113,6 @@ InModuleScope $ModuleName {
                     # Expected
                 }
                 Should -Invoke Get-AzKeyVault -Times 1 -ParameterFilter {
-                    Write-Host " ParameterFilter: $VaultName, $ResourceGroupName"
                     $VaultName         -eq 'testvault' -and
                     $ResourceGroupName -eq 'test-rg'
                 }

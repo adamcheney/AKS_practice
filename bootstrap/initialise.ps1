@@ -34,7 +34,7 @@ function Import-IaCAzureBackendModules {
     .EXAMPLE
         Import-IaCAzureBackendModules
     .NOTES
-        Uses Ensure-ModuleVersion to guarantee specific module versions.
+        Uses Ensure-ModuleVersionImport to guarantee specific module versions.
     #>
     [CmdletBinding()]
     param (

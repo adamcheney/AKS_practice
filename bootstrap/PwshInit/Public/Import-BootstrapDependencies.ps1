@@ -45,8 +45,6 @@ function Import-BootstrapDependencies {
         $Dependencies| ForEach-Object {
             $Name = $_.ModuleName
             $Version = $_.ModuleVersion
-            # Use -ListAvailable to check if module installed system-wide, not just current session.
-            $InstalledModule = Get-Module -Name $Name -ListAvailable -ErrorAction SilentlyContinue
 
             # Compare installed version to required version.
             if (-not ($InstalledModule | Where-Object Version -eq $Version)) {
@@ -72,7 +70,7 @@ function Import-BootstrapDependencies {
                 Write-Verbose "Module '$Name' (v$($InstalledModule.Version)) already meets requirement (v$Version). Skipping installation."
             }
             # Ensure the required version is imported
-            Ensure-ModuleVersion -ModuleName $Name -ModuleVersion $Version
+            Ensure-ModuleVersionImport -ModuleName $Name -ModuleVersion $Version
         }
     }
 
