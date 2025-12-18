@@ -20,53 +20,54 @@ Import-Module $modulePath -Force
 
 InModuleScope $ModuleName {
     Describe "Ensure-ModuleVersionImport" -Tag 'Unit' {
-        Context "When module is not installed" {
-            BeforeAll {
-                Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
-            }
-            It "Should throw an error" {
-                { Ensure-ModuleVersionImport -ModuleName 'Null' -ModuleVersion '0.0' } |
-                    Should -Throw "Module 'Null' version '0.0' not installed."
-            }
-        }
-        Context "When installed incorrect version" {
-            BeforeAll {
-                Mock Get-Module {
-                    @(
+        BeforeAll {
+            Mock Get-Module {
+                param($Name, $ListAvailable)
+                return [PSCustomObject]@{
+                    Name = $Name
+                    ModuleInfos = @(
                         [PSCustomObject]@{
-                            Name = 'Test'
-                            Version = [String]'4.2.0'
+                            Name    = 'Test'
+                            Version = [Version]'4.2.0'
+                        }
+                        [PSCustomObject]@{
+                            Name    = 'Test'
+                            Version = [Version]'4.2.1'
                         }
                     )
                 }
+            } -ParameterFilter { $ListAvailable }
+            Mock Get-Module {
+                param()
+                return $null
+            } -ParameterFilter { -not $ListAvailable }
+            Mock Import-Module {
+                param($args)
+                return [PSCustomObject]@{
+                    Name = 'Test'
+                    Version = [Version]'4.2.0'
+                }
             }
+            Mock Remove-Module {
+                param($Name) 
+                return $null
+            }
+            Mock Write-Verbose {
+                param($Message)
+                return $null
+            }
+            Mock Write-Error {
+                param($Message)
+                return $null
+            }
+        }
+        Context "When installed incorrect version" {
             It "Should throw an error" {
                 { Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '5.0.0' } |
                     Should -Throw "Module 'Test' version '5.0.0' not installed."
             }
         }
         Context "When module installed none imported" {
-            BeforeAll {
-                # Mock Get-Module -ListAvailable to return an array of installed modules
-                Mock Get-Module {
-                    @(
-                        [PSCustomObject]@{
-                            Name    = 'Test'
-                            Version = [Version]'4.2.0'
-                        }
-                    )
-                } -ParameterFilter { $ListAvailable }
-                # Mock Get-Module (no parameters) to indicate nothing is loaded in session
-                Mock Get-Module { $null } -ParameterFilter { -not $ListAvailable }
-                Mock Remove-Module { param($args) $null }
-                Mock Import-Module {
-                    param($args)
-                    [PSCustomObject]@{
-                        Name = 'Test'
-                        Version = [Version]'4.2.0'
-                    }
-                }
-            }
             It "Should import module and not unload" {
                 Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
                 Should -Invoke Remove-Module -Times 0
@@ -78,32 +79,21 @@ InModuleScope $ModuleName {
                 $result.Version | Should -Be '4.2.0'
             }
         }
+        Context "When module is not installed" {
+            It "Should throw an error" {
+                { Ensure-ModuleVersionImport -ModuleName 'Null' -ModuleVersion '1.0' } |
+                    Should -Throw "Module 'Null' version '1.0' not installed."
+            }
+        }
         Context "When module is installed correct version loaded" {
             BeforeAll {
-                # Mock Get-Module -ListAvailable to return an array of installed modules
                 Mock Get-Module {
-                    @(
-                        [PSCustomObject]@{
-                            Name    = 'Test'
-                            Version = [Version]'4.2.0'
-                        }
-                    )
-                } -ParameterFilter { $ListAvailable }
-                # Mock Get-Module (no parameters) to indicate nothing is loaded in session
-                Mock Get-Module {
-                    [PSCustomObject]@{
+                    param($Name, $ListAvailable)
+                    return [PSCustomObject]@{
                         Name    = 'Test'
                         Version = [Version]'4.2.0'
                     } 
                 } -ParameterFilter { -not $ListAvailable }
-                Mock Remove-Module { param($args) $null }
-                Mock Import-Module {
-                    param($args)
-                    [PSCustomObject]@{
-                        Name = 'Test'
-                        Version = [Version]'4.2.0'
-                    }
-                }
             }
             It "Should not unload but still import module" {
                 Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
@@ -118,34 +108,12 @@ InModuleScope $ModuleName {
         }
         Context "When module is installed incorrect version loaded" {
             BeforeAll {
-                # Mock Get-Module -ListAvailable to return an array of installed modules
-                Mock Get-Module {
-                    @(
-                        [PSCustomObject]@{
-                            Name    = 'Test'
-                            Version = [Version]'3.1.0'
-                        },
-                        [PSCustomObject]@{
-                            Name    = 'Test'
-                            Version = [Version]'4.2.0'
-                        }
-                    )
-                } -ParameterFilter { $ListAvailable }
-                # Mock Get-Module (no parameters) to indicate an incorrect version is loaded in session
                 Mock Get-Module {
                     [PSCustomObject]@{
                         Name    = 'Test'
                         Version = [Version]'3.1.0'
                     }
                 } -ParameterFilter { -not $ListAvailable }
-                Mock Remove-Module { param($args) $null }
-                Mock Import-Module {
-                    param($args)
-                    [PSCustomObject]@{
-                        Name = 'Test'
-                        Version = [Version]'4.2.0'
-                    }
-                }
             }
             It "Should unload and import correct module version" {
                 Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
@@ -166,50 +134,32 @@ InModuleScope $ModuleName {
                         Version = [Version]'3.1.0'
                     }
                 } -ParameterFilter { -not $ListAvailable }
-                Mock Get-Module { 
-                    @(
-                        [PSCustomObject]@{
-                            Name = 'Test';
-                            Version = [Version]'4.2.0'
-                        }
-                    )
-                } -ParameterFilter { $ListAvailable }
-                Mock Remove-Module { throw "Removal failed" }
-                Mock Import-Module {
-                    param($args)
-                    [PSCustomObject]@{
-                        Name = 'Test'
-                        Version = [Version]'4.2.0'
-                    }
+                Mock Remove-Module {
+                    param($Name)
+                    throw "Removal failed"
                 }
-                Mock Write-Error {}
             }
             It "Should write an error if Remove-Module fails" {
                 Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
-                Should -Invoke Write-Error -ParameterFilter { 
+                Should -Invoke Write-Error -Times 1 -ParameterFilter { 
                     $Message -match 'Failed to remove module' 
-                } -Times 1
+                }
             }
         }
         Context "When Import-Module fails" {
             BeforeAll {
-                Mock Get-Module {
-                    @(
-                        [PSCustomObject]@{
-                            Name = 'Test';
-                            Version = [Version]'4.2.0'
-                        }
-                    )
-                } -ParameterFilter { $ListAvailable }
-                Mock Get-Module { $null } -ParameterFilter { -not $ListAvailable }
-                Mock Remove-Module {}
-                Mock Import-Module { throw "Import failed" }
-                Mock Write-Error {}
+                Mock Import-Module {
+                    param($Name, $Version)
+                    throw "Import failed"
+                }
             }
             It "Should write an error if Import-Module fails" {
                 { Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0' } | Should -Throw "Import failed"
-                Should -Invoke Write-Error -ParameterFilter { $Message -match 'Failed to import module' } -Times 1
+                Should -Invoke Write-Error -Times 1 -ParameterFilter {
+                    $Message -match 'Failed to import module'
+                }
             }
         }
 
     }
+}

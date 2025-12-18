@@ -23,16 +23,17 @@ InModuleScope $ModuleName {
         BeforeAll {
             Mock Get-Module {
                 param($Name, $ListAvailable)
-                return [PSCustomObject]@{
-                    Name = $Name
-                    ModuleInfos = @()
-                }
+                return @(
+                    [PSCustomObject]@{
+                        Name = $Name
+                    }
+                )
             }
             Mock Install-PSResource {
                 param($Name, $Version, $Scope, $Repository)
                 return [PSCustomObject]@{
                     Name = $Name
-                    Version = $Version
+                    Version = [Version]$Version
                 }
             }
             Mock Write-Verbose {
@@ -45,16 +46,10 @@ InModuleScope $ModuleName {
             }
         }
         Context "When the module is not installed at all" {
-            BeforeAll {
-                Mock Get-Module {
-                    param($Name, $ListAvailable)
-                    return [PSCustomObject]@{}
-                }
-            }
             It "Should install the requested module version" {
-                Ensure-ModuleVersionInstall -ModuleName 'TestModule' -ModuleVersion '1.2.3'
+                Ensure-ModuleVersionInstall -ModuleName 'Test' -ModuleVersion '4.2.0'
                 Should -Invoke Install-PSResource -Times 1 -ParameterFilter {
-                    $Name -eq 'TestModule' -and $Version -eq '1.2.3'
+                    $Name -eq 'Test' -and $Version -eq '4.2.0'
                 }
             }
         }
@@ -62,21 +57,18 @@ InModuleScope $ModuleName {
             BeforeAll {
                 Mock Get-Module {
                     param($Name, $ListAvailable)
-                    return [PSCustomObject]@{
-                        Name = $Name
-                        ModuleInfos = @(
-                            [PSCustomObject]@{
-                                Name = $Name
-                                Version = '0.9.0'
-                            }
-                        )
-                    }
-                }
+                    return @(
+                        [PSCustomObject]@{
+                            Name = $Name
+                            Version = [Version]'3.1.0'
+                        }
+                    )
+                } -ParameterFilter { $ListAvailable }
             }
             It "Should install the requested module version" {
-                Ensure-ModuleVersionInstall -ModuleName 'TestModule' -ModuleVersion '1.2.3'
+                Ensure-ModuleVersionInstall -ModuleName 'Test' -ModuleVersion '4.2.0'
                 Should -Invoke Install-PSResource -Times 1 -ParameterFilter {
-                    $Name -eq 'TestModule' -and $Version -eq '1.2.3'
+                    $Name -eq 'Test' -and $Version -eq '4.2.0'
                 }
             }
         }
@@ -84,30 +76,61 @@ InModuleScope $ModuleName {
             BeforeAll {
                 Mock Get-Module {
                     param($Name, $ListAvailable)
-                    return [PSCustomObject]@{
-                        Name = $Name
-                        ModuleInfos = @(
-                            [PSCustomObject]@{
-                                Name = $Name
-                                Version = '0.9.0'
-                            }
-                            [PSCustomObject]@{
-                                Name = $Name
-                                Version = '1.0.0'
-                            }
-                            [PSCustomObject]@{
-                                Name = $Name
-                                Version = '1.1.0'
-                            }
-                        )
-                    }
+                    return @(
+                        [PSCustomObject]@{
+                            Name = $Name
+                            Version = [Version]'3.1.0'
+                        }
+                        [PSCustomObject]@{
+                            Name = $Name
+                            Version = [Version]'3.1.1'
+                        }
+                        [PSCustomObject]@{
+                            Name = $Name
+                            Version = [Version]'3.1.2'
+                        }
+                    )
                 }
             }
             It "Should install the requested module version" {
-                Ensure-ModuleVersionInstall -ModuleName 'TestModule' -ModuleVersion '1.2.3'
+                Ensure-ModuleVersionInstall -ModuleName 'Test' -ModuleVersion '4.2.0'
                 Should -Invoke Install-PSResource -Times 1 -ParameterFilter {
-                    $Name -eq 'TestModule' -and $Version -eq '1.2.3'
+                    $Name -eq 'Test' -and $Version -eq '4.2.0'
                 }
+            }
+        }
+        Context "When the requested module version is already installed" {
+            BeforeAll {
+                Mock Get-Module {
+                    param($Name, $ListAvailable)
+                    return @(
+                        [PSCustomObject]@{
+                            Name = $Name
+                            Version = [Version]'4.2.0'
+                        }
+                    )
+                } -ParameterFilter { $ListAvailable }
+            }
+            It "Should not attempt to install the module" {
+                Ensure-ModuleVersionInstall -ModuleName 'Test' -ModuleVersion '4.2.0'
+                Should -Invoke Install-PSResource -Times 0
+            }
+        }
+        Context "When called with -WhatIf" {
+            It "Should not attempt to install the module" {
+                Ensure-ModuleVersionInstall -ModuleName 'Test' -ModuleVersion '4.2.0' -WhatIf
+                Should -Invoke Install-PSResource -Times 0
+            }
+        }
+        Context "When Install-PSResource fails" {
+            BeforeAll {
+                Mock Install-PSResource {
+                    throw "Simulated installation failure."
+                }
+            }
+            It "Should throw an error" {
+                { Ensure-ModuleVersionInstall -ModuleName 'Test' -ModuleVersion '4.2.0' } |
+                    Should -Throw "Simulated installation failure."
             }
         }
     }

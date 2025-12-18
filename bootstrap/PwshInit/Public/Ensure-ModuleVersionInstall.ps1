@@ -30,7 +30,7 @@ function Ensure-ModuleVersionInstall {
         # Use -ListAvailable to check if module installed system-wide, not just current session.
         $InstalledModule = Get-Module -Name $ModuleName -ListAvailable -ErrorAction SilentlyContinue
         # Compare installed version to required version.
-        if (-not ($InstalledModule | Where-Object Version -eq $ModuleVersion)) {
+        if (-not ($InstalledModule | Where-Object { $_.Version -eq [Version]$ModuleVersion })) {
             Write-Verbose "Installing module '$ModuleName' version '$ModuleVersion'..."
             if ($PSCmdlet.ShouldProcess("PSResource $ModuleName", "Install PSResource version '$ModuleVersion'")) {
                 try {
@@ -41,17 +41,16 @@ function Ensure-ModuleVersionInstall {
                         Repository = 'PSGallery'
                     }
                     Install-PSResource @InstallParams -ErrorAction Stop
-                    Write-Verbose "Module '$Name' installed successfully."
+                    Write-Verbose "Module '$ModuleName' installed successfully."
                 }
                 catch {
-                    Write-Error "Failed to install module '$Name'. Error: $($_.Exception.Message)"
+                    Write-Error "Failed to install module '$ModuleName'. Error: $($_.Exception.Message)"
                     throw # Re-throw to stop the script
                 }
             }
         }
         else {
-            Write-Verbose "Module '$Name' (v$($InstalledModule.Version)) already meets requirement (v$Version). Skipping installation."
+            Write-Verbose "Module '$ModuleName' (v$($InstalledModule.Version)) already meets requirement (v$ModuleVersion). Skipping installation."
         }
-
     }
 }
