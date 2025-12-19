@@ -22,15 +22,12 @@ function Import-BootstrapDependencies {
         [String]$DependencyFile = (Join-Path -Path $PSScriptRoot -ChildPath 'dependencies.psd1')
     )
 
-    begin {
+    process {
         if (-not (Test-Path -Path $DependencyFile)) {
             throw "Dependency file '$DependencyFile' not found."
         }
         Write-Verbose "Importing dependencies from $DependencyFile"
         Set-PSResourceGetv3 -Version '1.1.1'
-    }
-
-    process {
         try {
             $Dependencies = (Import-PowerShellDataFile -Path $DependencyFile).RequiredModules
         }
@@ -46,35 +43,11 @@ function Import-BootstrapDependencies {
             $Name = $_.ModuleName
             $Version = $_.ModuleVersion
 
-            # Compare installed version to required version.
-            if (-not ($InstalledModule | Where-Object Version -eq $Version)) {
-                Write-Verbose "Installing module '$Name' version '$Version'..."
-                if ($PSCmdlet.ShouldProcess("PSResource $Name", "Install PSResource version '$Version'")) {
-                    try {
-                        $InstallParams = @{
-                            Name = $Name
-                            Version = $Version
-                            Scope = 'CurrentUser'
-                            Repository = 'PSGallery'
-                        }
-                        Install-PSResource @InstallParams -ErrorAction Stop
-                        Write-Verbose "Module '$Name' installed successfully."
-                    }
-                    catch {
-                        Write-Error "Failed to install module '$Name'. Error: $($_.Exception.Message)"
-                        throw # Re-throw to stop the script
-                    }
-                }
-            }
-            else {
-                Write-Verbose "Module '$Name' (v$($InstalledModule.Version)) already meets requirement (v$Version). Skipping installation."
-            }
+            # Ensure the required version is installed
+            Ensure-ModuleVersionInstall -ModuleName $Name -ModuleVersion $Version
             # Ensure the required version is imported
             Ensure-ModuleVersionImport -ModuleName $Name -ModuleVersion $Version
         }
-    }
-
-    end {
         Write-Verbose "All dependencies from '$DependencyFile' are installed and imported."
     }
 }

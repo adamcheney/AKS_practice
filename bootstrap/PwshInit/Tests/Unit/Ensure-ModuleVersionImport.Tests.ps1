@@ -23,19 +23,16 @@ InModuleScope $ModuleName {
         BeforeAll {
             Mock Get-Module {
                 param($Name, $ListAvailable)
-                return [PSCustomObject]@{
-                    Name = $Name
-                    ModuleInfos = @(
-                        [PSCustomObject]@{
-                            Name    = 'Test'
-                            Version = [Version]'4.2.0'
-                        }
-                        [PSCustomObject]@{
-                            Name    = 'Test'
-                            Version = [Version]'4.2.1'
-                        }
-                    )
-                }
+                return @(
+                    [PSCustomObject]@{
+                        Name    = 'Test'
+                        Version = [Version]'4.2.0'
+                    }
+                    [PSCustomObject]@{
+                        Name    = 'Test'
+                        Version = [Version]'4.2.1'
+                    }
+                )
             } -ParameterFilter { $ListAvailable }
             Mock Get-Module {
                 param()
