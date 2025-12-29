@@ -44,9 +44,9 @@ function Import-BootstrapDependencies {
             $Version = $_.ModuleVersion
 
             # Ensure the required version is installed
-            Ensure-ModuleVersionInstall -ModuleName $Name -ModuleVersion $Version
+            Confirm-ModuleVersionInstall -ModuleName $Name -ModuleVersion $Version
             # Ensure the required version is imported
-            Ensure-ModuleVersionImport -ModuleName $Name -ModuleVersion $Version
+            Confirm-ModuleVersionImport -ModuleName $Name -ModuleVersion $Version
         }
         Write-Verbose "All dependencies from '$DependencyFile' are installed and imported."
     }

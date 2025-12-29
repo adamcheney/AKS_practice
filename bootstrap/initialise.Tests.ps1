@@ -6,7 +6,7 @@
     Unit tests for functions in initialise.ps1:
       - Set-PSResourceGetv3: 
         ensures PSResourceGet v3 is installed/imported and returns the module info.
-      - Ensure-ModuleVersionImport: 
+      - Confirm-ModuleVersionImport: 
         validates that a specific module/version is available, imports or reloads as required.
       - Import-BootstrapDependencies: 
         reads a PSD1 of RequiredModules, installs missing modules and ensures versions are imported.
@@ -32,7 +32,7 @@ BeforeAll {
 Describe "Set-PSResourceGetv3" -Tag 'Unit' {
     BeforeAll {
         Mock Install-Module { param($args) $null }
-        Mock Ensure-ModuleVersionImport {
+        Mock Confirm-ModuleVersionImport {
             [PSCustomObject]@{
                 Name = 'Microsoft.PowerShell.PSResourceGet'
                 Version = [Version]'1.1.1'
@@ -48,7 +48,7 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
             Set-PSResourceGetv3 -Version '1.1.1'
             # Assert that the mocks were called
             Should -Invoke Install-Module -Times 1
-            Should -Invoke Ensure-ModuleVersionImport -Times 1
+            Should -Invoke Confirm-ModuleVersionImport -Times 1
         }
         It "Should return the expected module object" {
             $result = Set-PSResourceGetv3 -Version '1.1.1'
@@ -72,7 +72,7 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
             Set-PSResourceGetv3 -Version '1.1.1'
             # Assert that the mocks were called
             Should -Invoke Install-Module -Times 0
-            Should -Invoke Ensure-ModuleVersionImport -Times 1
+            Should -Invoke Confirm-ModuleVersionImport -Times 1
         }
         It "Should return the expected module object" {
             $result = Set-PSResourceGetv3 -Version '1.1.1'
@@ -84,7 +84,7 @@ Describe "Set-PSResourceGetv3" -Tag 'Unit' {
 
 Describe "Import-BootstrapDependencies" -Tag 'Unit' {
     BeforeAll {
-        Mock Set-PSResourceGetv3 { $null } # prevent calling the real Ensure-ModuleVersionImport for PSResourceGet
+        Mock Set-PSResourceGetv3 { $null } # prevent calling the real Confirm-ModuleVersionImport for PSResourceGet
     }
     Context "When dependency file not found" {
         BeforeAll {
@@ -156,7 +156,7 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
                     Version = [Version]'4.2.0'
                 }
             }
-            Mock Ensure-ModuleVersionImport {
+            Mock Confirm-ModuleVersionImport {
                 [PSCustomObject]@{
                     Name = 'Test'
                     Version = [Version]'4.2.0'
@@ -168,7 +168,7 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
             Should -Invoke Install-PSResource -ParameterFilter {
                 $Name -eq 'Test' -and $Version -eq '4.2.0'
             } -Times 1
-            Should -Invoke Ensure-ModuleVersionImport -ParameterFilter {
+            Should -Invoke Confirm-ModuleVersionImport -ParameterFilter {
                 $ModuleName -eq 'Test' -and $ModuleVersion -eq '4.2.0'
             } -Times 1
         }
@@ -190,17 +190,17 @@ Describe "Import-BootstrapDependencies" -Tag 'Unit' {
                 }
             }
             Mock Install-PSResource {}
-            Mock Ensure-ModuleVersionImport {
+            Mock Confirm-ModuleVersionImport {
                 [PSCustomObject]@{
                     Name = 'Test'
                     Version = [Version]'4.2.0'
                 }
             }
         }
-        It "Should skip installation and call Ensure-ModuleVersionImport" {
+        It "Should skip installation and call Confirm-ModuleVersionImport" {
             Import-BootstrapDependencies -DependencyFile 'valid.psd1'
             Should -Invoke Install-PSResource -Times 0
-            Should -Invoke Ensure-ModuleVersionImport -ParameterFilter {
+            Should -Invoke Confirm-ModuleVersionImport -ParameterFilter {
                 $ModuleName -eq 'Test' -and $ModuleVersion -eq '4.2.0'
             } -Times 1
         }

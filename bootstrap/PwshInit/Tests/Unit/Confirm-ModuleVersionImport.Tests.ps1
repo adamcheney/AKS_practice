@@ -1,12 +1,12 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Pester unit tests for PwshInit public function Ensure-ModuleVersionImport.
+    Pester unit tests for PwshInit public function Confirm-ModuleVersionImport.
 .DESCRIPTION
     No stub required to ensure deterministic, side-effect free tests.
 .EXAMPLE
     # Run the tests from the repository root
-    Invoke-Pester -Path ./bootstrap/PwshInit/Tests/Unit/Ensure-ModuleVersionImport.Tests.ps1
+    Invoke-Pester -Path ./bootstrap/PwshInit/Tests/Unit/Confirm-ModuleVersionImport.Tests.ps1
 .NOTES
     - Requires Pester v5+ and PowerShell 7+ (PowerShell Core).
     - The test file imports the module file PwshInit.psm1 from the module root folder.
@@ -14,12 +14,11 @@
 
 $ModuleName = 'PwshInit'
 $ModuleDir = (Get-Item $PSScriptRoot).Parent.Parent # Go up from /Unit to /Tests to /PwshInit
-$modulePath = Join-Path -Path $ModuleDir -ChildPath "$ModuleName.psm1"
 # Import the module
-Import-Module $modulePath -Force
+Import-Module $ModuleDir -Force
 
 InModuleScope $ModuleName {
-    Describe "Ensure-ModuleVersionImport" -Tag 'Unit' {
+    Describe "Confirm-ModuleVersionImport" -Tag 'Unit' {
         BeforeAll {
             Mock Get-Module {
                 param($Name, $ListAvailable)
@@ -60,25 +59,25 @@ InModuleScope $ModuleName {
         }
         Context "When installed incorrect version" {
             It "Should throw an error" {
-                { Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '5.0.0' } |
+                { Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '5.0.0' } |
                     Should -Throw "Module 'Test' version '5.0.0' not installed."
             }
         }
         Context "When module installed none imported" {
             It "Should import module and not unload" {
-                Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
+                Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
                 Should -Invoke Remove-Module -Times 0
                 Should -Invoke Import-Module -Times 1
             }
             It "Should return module object" {
-                $result = Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
+                $result = Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
                 $result.Name | Should -Be 'Test'
                 $result.Version | Should -Be '4.2.0'
             }
         }
         Context "When module is not installed" {
             It "Should throw an error" {
-                { Ensure-ModuleVersionImport -ModuleName 'Null' -ModuleVersion '1.0' } |
+                { Confirm-ModuleVersionImport -ModuleName 'Null' -ModuleVersion '1.0' } |
                     Should -Throw "Module 'Null' version '1.0' not installed."
             }
         }
@@ -93,12 +92,12 @@ InModuleScope $ModuleName {
                 } -ParameterFilter { -not $ListAvailable }
             }
             It "Should not unload but still import module" {
-                Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
+                Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
                 Should -Invoke Remove-Module -Times 0
                 Should -Invoke Import-Module -Times 1
             }
             It "Should return module object" {
-                $result = Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
+                $result = Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
                 $result.Name | Should -Be 'Test'
                 $result.Version | Should -Be '4.2.0'
             }
@@ -113,12 +112,12 @@ InModuleScope $ModuleName {
                 } -ParameterFilter { -not $ListAvailable }
             }
             It "Should unload and import correct module version" {
-                Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
+                Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
                 Should -Invoke Remove-Module -Times 1
                 Should -Invoke Import-Module -Times 1
             }
             It "Should return module object" {
-                $result = Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
+                $result = Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
                 $result.Name | Should -Be 'Test'
                 $result.Version | Should -Be '4.2.0'
             }
@@ -137,7 +136,7 @@ InModuleScope $ModuleName {
                 }
             }
             It "Should write an error if Remove-Module fails" {
-                Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
+                Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0'
                 Should -Invoke Write-Error -Times 1 -ParameterFilter { 
                     $Message -match 'Failed to remove module' 
                 }
@@ -151,7 +150,7 @@ InModuleScope $ModuleName {
                 }
             }
             It "Should write an error if Import-Module fails" {
-                { Ensure-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0' } | Should -Throw "Import failed"
+                { Confirm-ModuleVersionImport -ModuleName 'Test' -ModuleVersion '4.2.0' } | Should -Throw "Import failed"
                 Should -Invoke Write-Error -Times 1 -ParameterFilter {
                     $Message -match 'Failed to import module'
                 }

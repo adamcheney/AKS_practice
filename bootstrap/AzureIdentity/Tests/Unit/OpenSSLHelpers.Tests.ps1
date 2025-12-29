@@ -14,9 +14,8 @@
 
 $ModuleName = 'AzureIdentity'
 $ModuleDir = (Get-Item $PSScriptRoot).Parent.Parent # Go up from /Unit to /Tests to /AzureIdentity
-$modulePath = Join-Path -Path $ModuleDir -ChildPath "$ModuleName.psm1"
 # Import the module
-Import-Module $modulePath -Force
+Import-Module $ModuleDir -Force
 
 InModuleScope $ModuleName {
     Describe "Get-OpenSSLInfo" -Tag 'Unit' {

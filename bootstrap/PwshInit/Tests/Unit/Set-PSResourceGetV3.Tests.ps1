@@ -14,9 +14,8 @@
 
 $ModuleName = 'PwshInit'
 $ModuleDir = (Get-Item $PSScriptRoot).Parent.Parent # Go up from /Unit to /Tests to /PwshInit
-$modulePath = Join-Path -Path $ModuleDir -ChildPath "$ModuleName.psm1"
 # Import the module
-Import-Module $modulePath -Force
+Import-Module $ModuleDir -Force
 
 InModuleScope $ModuleName {
     Describe "Set-PSResourceGetv3" -Tag 'Unit' {
@@ -25,7 +24,7 @@ InModuleScope $ModuleName {
                 param($args) 
                 return $null
             }
-            Mock Ensure-ModuleVersionImport {
+            Mock Confirm-ModuleVersionImport {
                 return [PSCustomObject]@{
                     Name = 'Microsoft.PowerShell.PSResourceGet'
                     Version = [Version]'1.1.1'
@@ -47,7 +46,7 @@ InModuleScope $ModuleName {
                 Set-PSResourceGetv3 -Version '1.1.1'
                 # Assert that the mocks were called
                 Should -Invoke Install-Module -Times 1
-                Should -Invoke Ensure-ModuleVersionImport -Times 1
+                Should -Invoke Confirm-ModuleVersionImport -Times 1
             }
             It "Should return the expected module object" {
                 $result = Set-PSResourceGetv3 -Version '1.1.1'
@@ -71,7 +70,7 @@ InModuleScope $ModuleName {
                 Set-PSResourceGetv3 -Version '1.1.1'
                 # Assert that the mocks were called
                 Should -Invoke Install-Module -Times 0
-                Should -Invoke Ensure-ModuleVersionImport -Times 1
+                Should -Invoke Confirm-ModuleVersionImport -Times 1
             }
             It "Should return the expected module object" {
                 $result = Set-PSResourceGetv3 -Version '1.1.1'

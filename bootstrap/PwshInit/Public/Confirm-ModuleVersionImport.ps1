@@ -1,4 +1,4 @@
-function Ensure-ModuleVersionImport {
+function Confirm-ModuleVersionImport {
     <#
     .SYNOPSIS
         Ensure a specific module version is imported into the session.
@@ -11,7 +11,7 @@ function Ensure-ModuleVersionImport {
     .PARAMETER ModuleVersion
         The exact module version required (string).
     .EXAMPLE
-        Ensure-ModuleVersionImport -ModuleName 'Az.Accounts' -ModuleVersion '2.0.0'
+        Confirm-ModuleVersionImport -ModuleName 'Az.Accounts' -ModuleVersion '2.0.0'
     .OUTPUTS
         The imported module object (PassThru) when import succeeds.
     .NOTES

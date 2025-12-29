@@ -1,4 +1,4 @@
-function Ensure-ModuleVersionInstall {
+function Confirm-ModuleVersionInstall {
     <#
     .SYNOPSIS
         Ensure a specific module version is installed locally.
@@ -10,7 +10,7 @@ function Ensure-ModuleVersionInstall {
     .PARAMETER ModuleVersion
         The exact module version required (string).
     .EXAMPLE
-        Ensure-ModuleVersionInstall -ModuleName 'Az.Accounts' -ModuleVersion '2.0.0'
+        Confirm-ModuleVersionInstall -ModuleName 'Az.Accounts' -ModuleVersion '2.0.0'
     .OUTPUTS
         The imported module object (PassThru) when import succeeds.
     .NOTES

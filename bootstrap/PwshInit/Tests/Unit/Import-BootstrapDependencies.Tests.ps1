@@ -14,9 +14,8 @@
 
 $ModuleName = 'PwshInit'
 $ModuleDir = (Get-Item $PSScriptRoot).Parent.Parent # Go up from /Unit to /Tests to /PwshInit
-$modulePath = Join-Path -Path $ModuleDir -ChildPath "$ModuleName.psm1"
 # Import the module
-Import-Module $modulePath -Force
+Import-Module $ModuleDir -Force
 
 InModuleScope $ModuleName {
     Describe "Import-BootstrapDependencies" -Tag 'Unit' {
@@ -48,14 +47,14 @@ InModuleScope $ModuleName {
                     )
                 }
             }
-            Mock Ensure-ModuleVersionInstall {
+            Mock Confirm-ModuleVersionInstall {
                 param($ModuleName, $ModuleVersion)
                 return [PSCustomObject]@{
                     Name = $ModuleName
                     Version = [Version]$ModuleVersion
                 }
             }
-            Mock Ensure-ModuleVersionImport {
+            Mock Confirm-ModuleVersionImport {
                 param($ModuleName, $ModuleVersion)
                 return [PSCustomObject]@{
                     Name = $ModuleName
@@ -76,16 +75,16 @@ InModuleScope $ModuleName {
                 Should -Invoke Import-PowerShellDataFile -Times 1 -ParameterFilter {
                     $Path -eq 'test.psd1'
                 }
-                Should -Invoke Ensure-ModuleVersionInstall -Times 1 -ParameterFilter {
+                Should -Invoke Confirm-ModuleVersionInstall -Times 1 -ParameterFilter {
                     $ModuleName -eq 'Test1' -and $ModuleVersion -eq '1.0.0'
                 }
-                Should -Invoke Ensure-ModuleVersionInstall -Times 1 -ParameterFilter {
+                Should -Invoke Confirm-ModuleVersionInstall -Times 1 -ParameterFilter {
                     $ModuleName -eq 'Test2' -and $ModuleVersion -eq '2.1.0'
                 }
-                Should -Invoke Ensure-ModuleVersionImport -Times 1 -ParameterFilter {
+                Should -Invoke Confirm-ModuleVersionImport -Times 1 -ParameterFilter {
                     $ModuleName -eq 'Test1' -and $ModuleVersion -eq '1.0.0'
                 }
-                Should -Invoke Ensure-ModuleVersionImport -Times 1 -ParameterFilter {
+                Should -Invoke Confirm-ModuleVersionImport -Times 1 -ParameterFilter {
                     $ModuleName -eq 'Test2' -and $ModuleVersion -eq '2.1.0'
                 }
             }
@@ -127,8 +126,8 @@ InModuleScope $ModuleName {
                 Should -Invoke Write-Information -Times 1 -ParameterFilter {
                     $Message -eq "No RequiredModules found in 'empty.psd1'. Nothing to import."
                 }
-                Should -Invoke Ensure-ModuleVersionInstall -Times 0
-                Should -Invoke Ensure-ModuleVersionImport -Times 0
+                Should -Invoke Confirm-ModuleVersionInstall -Times 0
+                Should -Invoke Confirm-ModuleVersionImport -Times 0
             }
         }
     }
